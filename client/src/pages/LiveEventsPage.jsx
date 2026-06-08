@@ -949,7 +949,7 @@ export default function LiveEventsPage() {
         <button
           type="button"
           className="live-events-hero-close"
-          onClick={() => navigate('/login?logo=1')}
+          onClick={() => navigate(-1)}
           aria-label="סגירת דף וחזרה לדף הקודם"
           title="סגור"
         >

@@ -1,12 +1,11 @@
 /**
- * בסיס לקריאות fetch ל־API:
- * - VITE_API_URL אם מוגדר
- * - ב־Vite dev: מחרוזת ריקה — כתובת יחסית `/api/...` עוברת ב־proxy ל־localhost:3001 (עובד גם מטלפון ב־LAN)
- * - בבילד לייצור בלי env: שרת הייצור
+ * Returns the API base URL for fetch calls.
+ * In production: VITE_API_URL env var (Railway server)
+ * In dev: empty string → Vite proxy to localhost:3001
  */
 export function getApiBaseUrl() {
   const raw = (import.meta.env.VITE_API_URL || '').trim().replace(/\/$/, '');
   if (raw) return raw;
   if (import.meta.env.DEV) return '';
-  return 'https://oh-my-god-production.up.railway.app';
+  return 'https://omg-plus-production.up.railway.app';
 }

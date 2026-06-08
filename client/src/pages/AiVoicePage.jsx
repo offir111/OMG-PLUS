@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import { getApiBaseUrl } from "../lib/apiBaseUrl.js";
+const API_BASE = getApiBaseUrl();
 
 const CHARACTERS = [
   {
@@ -134,7 +136,7 @@ export default function AiVoicePage() {
     setInputText("");
 
     try {
-      const res = await fetch("/api/voice-proxy", {
+      const res = await fetch(`${API_BASE}/api/voice-proxy`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

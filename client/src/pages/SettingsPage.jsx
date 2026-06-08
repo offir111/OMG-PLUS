@@ -65,7 +65,7 @@ export default function SettingsPage() {
     <div className="page page-no-nav" style={{ position: 'relative' }}>
       <button
         type="button"
-        onClick={() => navigate('/login?logo=1')}
+        onClick={() => navigate(-1)}
         aria-label="סגירה וחזרה לדף הקודם"
         style={{
           position: 'absolute', top: 14, left: 12, zIndex: 10,

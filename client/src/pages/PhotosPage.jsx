@@ -10,7 +10,7 @@ export default function PhotosPage() {
     <div style={{ maxWidth: 700, margin: '0 auto', padding: '16px 12px', direction: 'rtl', position: 'relative' }}>
       <button
         type="button"
-        onClick={() => navigate('/login?logo=1')}
+        onClick={() => navigate(-1)}
         aria-label="סגירה וחזרה לדף הקודם"
         style={{
           position: 'absolute', top: 14, left: 12, zIndex: 10,

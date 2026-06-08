@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { io } from 'socket.io-client';
+import { getApiBaseUrl } from '../lib/apiBaseUrl.js';
+const API_BASE = getApiBaseUrl();
 
 // ─── Static Data ────────────────────────────────────────────────────────────
 
@@ -619,7 +621,7 @@ function BibleQA() {
     setAnswer(null);
     setError('');
     try {
-      const res = await fetch('/api/knowledge-ask', {
+      const res = await fetch(`${API_BASE}/api/knowledge-ask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: trimmed, topic: 'bible' })

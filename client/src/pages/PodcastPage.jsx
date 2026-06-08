@@ -181,7 +181,7 @@ export default function PodcastPage() {
         </h1>
         <button
           type="button"
-          onClick={() => navigate('/login?logo=1')}
+          onClick={() => navigate(-1)}
           aria-label="סגירה וחזרה לדף הקודם"
           style={{
             width: 36, height: 36, borderRadius: 10,

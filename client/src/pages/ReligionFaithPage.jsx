@@ -8,7 +8,7 @@ export default function ReligionFaithPage() {
     <div style={{ position: 'relative' }}>
       <button
         type="button"
-        onClick={() => navigate('/login?logo=1')}
+        onClick={() => navigate(-1)}
         aria-label="סגירה וחזרה לדף הקודם"
         style={{
           position: 'absolute', top: 12, left: 12, zIndex: 20,

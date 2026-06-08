@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+﻿import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getApiBaseUrl } from '../lib/apiBaseUrl.js';
 import './AdminPage.css';
@@ -455,7 +455,7 @@ export default function AdminPage() {
           <span>לוח בקרה — מנהל OMG</span>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button className="admin-btn admin-btn-orange admin-btn-sm" onClick={() => navigate('/login?logo=1')}>← חזרה לאפליקציה</button>
+          <button className="admin-btn admin-btn-orange admin-btn-sm" onClick={() => navigate(-1)}>← חזרה לאפליקציה</button>
           <button className="admin-btn admin-btn-gray admin-btn-sm" onClick={logout}>התנתק</button>
         </div>
       </div>

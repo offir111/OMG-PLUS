@@ -530,7 +530,7 @@ export default function CageUserProfilePage() {
     disconnectSocket();
     setUser(null);
     resetDebate();
-    navigate('/login?logo=1');
+    navigate(-1);
   }, [setUser, resetDebate, navigate]);
 
   // Auto-save on page exit when there are unsaved changes
@@ -727,7 +727,7 @@ export default function CageUserProfilePage() {
       <VirtualUserProfile
         data={virtualData}
         posts={virtualPosts}
-        onClose={() => navigate('/login?logo=1')}
+        onClose={() => navigate(-1)}
         viewerUsername={viewerNorm || ''}
       />
     );
@@ -882,7 +882,7 @@ export default function CageUserProfilePage() {
         </div>
       ) : null}
 
-      <CageTopBar onClose={() => navigate('/login?logo=1')} />
+      <CageTopBar onClose={() => navigate(-1)} />
 
       {/* ── Hero card ── */}
       <div style={{

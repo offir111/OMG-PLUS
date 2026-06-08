@@ -2833,7 +2833,7 @@ export default function ArgumentsPage({
             <button
               type="button"
               className="args-page-close-x"
-              onClick={() => navigate('/login?logo=1')}
+              onClick={() => navigate(-1)}
               aria-label="סגירת מאגר הידע וחזרה לדף הקודם"
             >
               ✕

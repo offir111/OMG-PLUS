@@ -391,7 +391,7 @@ function PostCard({
           ) : (
             <p style={{ margin: 0, padding: '10px 14px', color: 'var(--muted)', fontSize: '0.8rem' }}>
               <span style={{ cursor: 'pointer', color: 'var(--accent)', textDecoration: 'underline' }}
-                onClick={() => navigate('/login?logo=1')}>התחבר</span> כדי להגיב
+                onClick={() => navigate(-1)}>התחבר</span> כדי להגיב
             </p>
           )}
         </div>
@@ -617,7 +617,7 @@ export default function BlogPage() {
         <span style={{ fontWeight: 900, fontSize: '1rem', color: 'var(--text)' }}>בלוג</span>
         <button
           type="button"
-          onClick={() => navigate('/login?logo=1')}
+          onClick={() => navigate(-1)}
           aria-label="סגירת הבלוג וחזרה לדף הקודם"
           style={{
             position: 'absolute', top: '50%', left: 12, transform: 'translateY(-50%)',

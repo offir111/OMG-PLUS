@@ -9,6 +9,30 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// Simple in-memory rate limiter (no external dependency)
+const rateLimitMap = new Map();
+function rateLimit({ windowMs = 60000, max = 60, message = 'Too many requests' } = {}) {
+  return (req, res, next) => {
+    const key = req.ip || 'unknown';
+    const now = Date.now();
+    const entry = rateLimitMap.get(key) || { count: 0, reset: now + windowMs };
+    if (now > entry.reset) { entry.count = 0; entry.reset = now + windowMs; }
+    entry.count++;
+    rateLimitMap.set(key, entry);
+    if (entry.count > max) {
+      return res.status(429).json({ ok: false, error: message });
+    }
+    next();
+  };
+}
+// Clean up rate limit map every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of rateLimitMap) {
+    if (now > val.reset) rateLimitMap.delete(key);
+  }
+}, 300_000);
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -187,7 +211,8 @@ app.get('/api/health', (_req, res) => {
 });
 
 // Register
-app.post('/api/register', (req, res) => {
+const authLimiter = rateLimit({ windowMs: 60000, max: 10, message: 'יותר מדי ניסיונות — נסה שוב בעוד דקה' });
+app.post('/api/register', authLimiter, (req, res) => {
   const { username, password, side } = req.body || {};
   if (!username || !password) {
     return res.status(400).json({ ok: false, error: 'username and password required' });
@@ -214,7 +239,7 @@ app.post('/api/register', (req, res) => {
 });
 
 // Login
-app.post('/api/login', (req, res) => {
+app.post('/api/login', authLimiter, (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) {
     return res.status(400).json({ ok: false, error: 'username and password required' });
@@ -377,7 +402,7 @@ app.post('/api/voice-proxy', async (req, res) => {
 });
 
 // Admin login
-app.post('/api/admin/login', (req, res) => {
+app.post('/api/admin/login', rateLimit({ windowMs: 60000, max: 5 }), (req, res) => {
   const { password } = req.body || {};
   if (password !== ADMIN_PASSWORD) {
     return res.status(403).json({ ok: false, error: 'Invalid password' });

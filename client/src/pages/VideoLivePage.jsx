@@ -399,7 +399,7 @@ export default function VideoLivePage() {
       <div style={{ position: 'relative', marginBottom: 0 }}>
         <button
           type="button"
-          onClick={() => navigate('/login?logo=1')}
+          onClick={() => navigate(-1)}
           aria-label="סגירה וחזרה לדף הקודם"
           style={{
             position: 'absolute', top: '50%', left: 0, transform: 'translateY(-50%)', zIndex: 10,

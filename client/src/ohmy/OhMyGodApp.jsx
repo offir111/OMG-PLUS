@@ -1,8 +1,7 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { OHMY_API_URL, OHMY_USER_KEY } from './ohmyConfig.js';
 
-// Pages — same code, different server
 import LoginPage from '../pages/LoginPage.jsx';
 import LobbyPage from '../pages/LobbyPage.jsx';
 import DebatePage from '../pages/DebatePage.jsx';
@@ -26,12 +25,10 @@ import MiniRadioBar from '../components/layout/MiniRadioBar.jsx';
 import { RadioAudioProvider } from '../context/RadioAudioContext.jsx';
 import { applyPreferencesToDocument, loadPreferences } from '../lib/appPreferences.js';
 
-// Override VITE_API_URL for mode 2
-if (typeof window !== 'undefined') {
-  window.__OHMY_MODE__ = true;
-  window.__OHMY_API_URL__ = OHMY_API_URL;
-  window.__OHMY_USER_KEY__ = OHMY_USER_KEY;
-}
+// Activate Oh My God mode — overrides API base and user key
+window.__OHMY_MODE__ = true;
+window.__OHMY_API_URL__ = OHMY_API_URL;
+window.__OHMY_USER_KEY__ = OHMY_USER_KEY;
 
 function getOhmyUser() {
   try {
@@ -42,10 +39,20 @@ function getOhmyUser() {
   } catch { return null; }
 }
 
-function ProtectedRoute({ children }) {
+function Protected({ children }) {
   const user = getOhmyUser();
   if (!user) return <Navigate to="/v2/login" replace />;
   return children;
+}
+
+function Shell({ children }) {
+  return (
+    <>
+      <AppHeader />
+      <MiniRadioBar />
+      <main id="main-content">{children}</main>
+    </>
+  );
 }
 
 function RootRedirect() {
@@ -59,48 +66,41 @@ function ProfileMeRedirect() {
   return <Navigate to={`/v2/profile/${encodeURIComponent(user.username)}`} replace />;
 }
 
-function Shell({ children }) {
-  return (
-    <>
-      <AppHeader />
-      <MiniRadioBar />
-      <main id="main-content" style={{ paddingTop: 0 }}>
-        {children}
-      </main>
-    </>
-  );
-}
-
 export default function OhMyGodApp() {
   useEffect(() => {
     applyPreferencesToDocument(loadPreferences());
+    return () => {
+      // Clean up mode flag when leaving mode 2
+      window.__OHMY_MODE__ = false;
+    };
   }, []);
 
   return (
     <RadioAudioProvider>
+      {/* Relative routes — parent already matched /v2/* */}
       <Routes>
-        <Route path="/v2" element={<RootRedirect />} />
-        <Route path="/v2/login" element={<LoginPage />} />
-        <Route path="/v2/spectate/:debateId" element={<SpectatorPage />} />
-        <Route path="/v2/admin" element={<AdminPage />} />
+        <Route index element={<RootRedirect />} />
+        <Route path="login" element={<LoginPage />} />
+        <Route path="spectate/:debateId" element={<SpectatorPage />} />
+        <Route path="admin" element={<AdminPage />} />
 
-        <Route path="/v2/lobby" element={<ProtectedRoute><Shell><LobbyPage /></Shell></ProtectedRoute>} />
-        <Route path="/v2/debate/:debateId" element={<ProtectedRoute><Shell><DebatePage /></Shell></ProtectedRoute>} />
-        <Route path="/v2/faith" element={<ProtectedRoute><Shell><ReligionFaithPage /></Shell></ProtectedRoute>} />
-        <Route path="/v2/ai-voice" element={<ProtectedRoute><Shell><AiVoicePage /></Shell></ProtectedRoute>} />
-        <Route path="/v2/radio" element={<ProtectedRoute><Shell><RadioPage /></Shell></ProtectedRoute>} />
-        <Route path="/v2/blog" element={<ProtectedRoute><Shell><BlogPage /></Shell></ProtectedRoute>} />
-        <Route path="/v2/leaderboard" element={<ProtectedRoute><Shell><LeaderboardPage /></Shell></ProtectedRoute>} />
-        <Route path="/v2/knowledge" element={<ProtectedRoute><Shell><KnowledgeBasePage /></Shell></ProtectedRoute>} />
-        <Route path="/v2/knowledge/:id" element={<ProtectedRoute><Shell><DebateDetailPage /></Shell></ProtectedRoute>} />
-        <Route path="/v2/video" element={<ProtectedRoute><Shell><VideoLivePage /></Shell></ProtectedRoute>} />
-        <Route path="/v2/video-live" element={<Navigate to="/v2/video" replace />} />
-        <Route path="/v2/podcast" element={<ProtectedRoute><Shell><PodcastPage /></Shell></ProtectedRoute>} />
-        <Route path="/v2/profile/me" element={<ProtectedRoute><ProfileMeRedirect /></ProtectedRoute>} />
-        <Route path="/v2/profile/:username" element={<ProtectedRoute><Shell><CageUserProfilePage /></Shell></ProtectedRoute>} />
-        <Route path="/v2/registered" element={<ProtectedRoute><Shell><RegisteredMembersPage /></Shell></ProtectedRoute>} />
-        <Route path="/v2/settings" element={<ProtectedRoute><Shell><SettingsPage /></Shell></ProtectedRoute>} />
-        <Route path="/v2/arguments" element={<ProtectedRoute><Shell><ArgumentsPage /></Shell></ProtectedRoute>} />
+        <Route path="lobby" element={<Protected><Shell><LobbyPage /></Shell></Protected>} />
+        <Route path="debate/:debateId" element={<Protected><Shell><DebatePage /></Shell></Protected>} />
+        <Route path="faith" element={<Protected><Shell><ReligionFaithPage /></Shell></Protected>} />
+        <Route path="ai-voice" element={<Protected><Shell><AiVoicePage /></Shell></Protected>} />
+        <Route path="radio" element={<Protected><Shell><RadioPage /></Shell></Protected>} />
+        <Route path="blog" element={<Protected><Shell><BlogPage /></Shell></Protected>} />
+        <Route path="leaderboard" element={<Protected><Shell><LeaderboardPage /></Shell></Protected>} />
+        <Route path="knowledge" element={<Protected><Shell><KnowledgeBasePage /></Shell></Protected>} />
+        <Route path="knowledge/:id" element={<Protected><Shell><DebateDetailPage /></Shell></Protected>} />
+        <Route path="video" element={<Protected><Shell><VideoLivePage /></Shell></Protected>} />
+        <Route path="video-live" element={<Navigate to="/v2/video" replace />} />
+        <Route path="podcast" element={<Protected><Shell><PodcastPage /></Shell></Protected>} />
+        <Route path="profile/me" element={<Protected><ProfileMeRedirect /></Protected>} />
+        <Route path="profile/:username" element={<Protected><Shell><CageUserProfilePage /></Shell></Protected>} />
+        <Route path="registered" element={<Protected><Shell><RegisteredMembersPage /></Shell></Protected>} />
+        <Route path="settings" element={<Protected><Shell><SettingsPage /></Shell></Protected>} />
+        <Route path="arguments" element={<Protected><Shell><ArgumentsPage /></Shell></Protected>} />
         <Route path="*" element={<Navigate to="/v2" replace />} />
       </Routes>
     </RadioAudioProvider>

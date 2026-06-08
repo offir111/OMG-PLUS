@@ -320,7 +320,7 @@ export default function LoginPage() {
       const res = await fetch(`${API_BASE}/api/stats`);
       if (res.ok) {
         const data = await res.json();
-        setStats({ total: data.total ?? data.users ?? null, online: data.online ?? null });
+        setStats({ total: data.registered ?? data.total ?? null, online: data.online ?? null });
       }
     } catch {
       // silent — stats are cosmetic

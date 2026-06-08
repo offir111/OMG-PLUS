@@ -21,7 +21,9 @@ const SNAPSHOT_PATH = path.join(__dirname, 'store-snapshot.json');
 
 const ALLOWED_ORIGINS = [
   'https://omg-plus.vercel.app',
+  'https://omg-plus-d5ic0tbqi-offir1.vercel.app',
   'http://localhost:5173',
+  'http://localhost:3000',
 ];
 
 // ─── In-memory store ──────────────────────────────────────────────────────────
@@ -165,7 +167,7 @@ const app = express();
 
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+    if (!origin || ALLOWED_ORIGINS.includes(origin) || /\.vercel\.app$/.test(origin)) {
       cb(null, true);
     } else {
       cb(new Error(`CORS: origin ${origin} not allowed`));
@@ -186,7 +188,7 @@ app.get('/api/health', (_req, res) => {
 
 // Register
 app.post('/api/register', (req, res) => {
-  const { username, password } = req.body || {};
+  const { username, password, side } = req.body || {};
   if (!username || !password) {
     return res.status(400).json({ ok: false, error: 'username and password required' });
   }
@@ -196,19 +198,40 @@ app.post('/api/register', (req, res) => {
   if (registeredUsers.has(username)) {
     return res.status(409).json({ ok: false, error: 'username taken' });
   }
-  const passwordHash = sha256(password);
+  const passwordHash = sha256(username.toLowerCase() + password);
   const user = {
     passwordHash,
     score: 0,
     voiceDebates: 0,
     giftsReceived: 0,
-    side: null,
+    side: side || 'believer',
     createdAt: Date.now(),
     blocked: false,
   };
   registeredUsers.set(username, user);
-  console.log(`[register] new user: ${username}`);
-  res.json({ ok: true, user: { username, score: 0, createdAt: user.createdAt } });
+  console.log(`[register] new user: ${username} side: ${user.side}`);
+  res.json({ ok: true, user: { username, side: user.side, score: 0, createdAt: user.createdAt } });
+});
+
+// Login
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body || {};
+  if (!username || !password) {
+    return res.status(400).json({ ok: false, error: 'username and password required' });
+  }
+  const user = registeredUsers.get(username);
+  if (!user) {
+    return res.status(404).json({ ok: false, error: 'user not found' });
+  }
+  const hash = sha256(username.toLowerCase() + password);
+  if (hash !== user.passwordHash) {
+    return res.status(401).json({ ok: false, error: 'wrong password' });
+  }
+  if (user.blocked) {
+    return res.status(403).json({ ok: false, error: 'user is blocked' });
+  }
+  console.log(`[login] user: ${username}`);
+  res.json({ ok: true, user: { username, side: user.side, score: user.score, createdAt: user.createdAt } });
 });
 
 // Stats

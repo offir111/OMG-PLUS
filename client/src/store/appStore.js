@@ -22,7 +22,7 @@ export const useAppStore = create(
       setRadioPlaying: (radioPlaying) => set({ radioPlaying }),
     }),
     {
-      name: 'omgplus_user',
+      name: 'omgplus_store',
       partialize: (state) => ({ user: state.user, isLoggedIn: state.isLoggedIn }),
     }
   )

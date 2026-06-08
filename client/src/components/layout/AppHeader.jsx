@@ -492,10 +492,17 @@ export default function AppHeader({ user, onNavigate }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const panelRef = useRef(null);
 
-  // Resolve user from prop or localStorage
+  // Resolve user from prop or localStorage (handle both direct and Zustand-wrapped formats)
   const resolvedUser = user || (() => {
     try {
-      return JSON.parse(localStorage.getItem('omgplus_user') || '{}');
+      const raw = localStorage.getItem('omgplus_user');
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      // Direct format: { username, side, score }
+      if (parsed?.username) return parsed;
+      // Zustand persist format: { state: { user: {...} } }
+      if (parsed?.state?.user?.username) return parsed.state.user;
+      return {};
     } catch {
       return {};
     }
@@ -669,7 +676,7 @@ export default function AppHeader({ user, onNavigate }) {
           <ActionButton
             emoji="👤"
             label="פרופיל"
-            onClick={() => handleNavigate('/profile')}
+            onClick={() => handleNavigate(`/profile/${resolvedUser?.username || 'me'}`)}
           />
           <ActionButton
             emoji="⚙️"

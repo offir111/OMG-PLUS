@@ -406,11 +406,15 @@ export default function App() {
               }
             />
 
-            {/* Legacy route aliases — keep old URLs working */}
+            {/* Route aliases */}
             <Route path="/video-live" element={<Navigate to="/video" replace />} />
             <Route path="/knowledge-base" element={<Navigate to="/knowledge" replace />} />
             <Route path="/arguments" element={<Navigate to="/knowledge" replace />} />
             <Route path="/live-events" element={<Navigate to="/lobby" replace />} />
+            <Route path="/profile" element={<Navigate to="/profile/me" replace />} />
+            <Route path="/profile/me" element={
+              <ProtectedRoute><ProfileMeRedirect /></ProtectedRoute>
+            } />
 
             {/* Catch-all → root (which redirects to /login or /lobby) */}
             <Route path="*" element={<Navigate to="/" replace />} />

@@ -6,6 +6,8 @@ import AppHeader from './components/layout/AppHeader.jsx';
 import MiniRadioBar from './components/layout/MiniRadioBar.jsx';
 import { RadioAudioProvider } from './context/RadioAudioContext.jsx';
 import { applyPreferencesToDocument, loadPreferences } from './lib/appPreferences.js';
+import OhMyGodApp from './ohmy/OhMyGodApp.jsx';
+import ModeSwitcher from './ohmy/ModeSwitcher.jsx';
 
 // Pages
 import LoginPage from './pages/LoginPage.jsx';
@@ -224,7 +226,11 @@ export default function App() {
     <BrowserRouter>
       <RadioAudioProvider>
         <AppErrorBoundary>
+          <ModeSwitcher />
           <Routes>
+            {/* ── Mode 2 — Oh My God original app (/v2/*) ── */}
+            <Route path="/v2/*" element={<OhMyGodApp />} />
+
             {/* Public root redirect */}
             <Route path="/" element={<RootRedirect />} />
 

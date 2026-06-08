@@ -19,24 +19,34 @@ export default function ModeSwitcher() {
 
   function switchTo(mode) {
     setMode(mode);
-    if (mode === '1') {
-      navigate('/lobby');
-    } else {
-      // When switching to Mode 2, copy the session from omgplus_user → omg_user
-      // so the user doesn't need to log in again
-      try {
-        const v1User = localStorage.getItem('omgplus_user');
-        if (v1User) {
-          const parsed = JSON.parse(v1User);
-          // Handle both direct format and Zustand-wrapped format
-          const user = parsed?.state?.user ?? parsed;
+
+    // Copy session between modes so no re-login needed
+    try {
+      if (mode === '2') {
+        // Mode 1 → Mode 2: copy omgplus_user to omg_user
+        const raw = localStorage.getItem('omgplus_user');
+        if (raw) {
+          const p = JSON.parse(raw);
+          const user = p?.state?.user ?? p;
           if (user?.username) {
             localStorage.setItem('omg_user', JSON.stringify(user));
           }
         }
-      } catch {}
-      navigate('/v2/lobby');
-    }
+      } else {
+        // Mode 2 → Mode 1: copy omg_user to omgplus_user
+        const raw = localStorage.getItem('omg_user');
+        if (raw) {
+          const p = JSON.parse(raw);
+          if (p?.username) {
+            localStorage.setItem('omgplus_user', JSON.stringify(p));
+          }
+        }
+      }
+    } catch {}
+
+    // Use full page navigation to avoid stale route state
+    const dest = mode === '1' ? '/lobby' : '/v2/lobby';
+    window.location.href = dest;
   }
 
   return (

@@ -22,16 +22,20 @@ import ArgumentsPage from '../pages/ArgumentsPage.jsx';
 
 // ─── Auth helpers ────────────────────────────────────────────────────────────
 
-/** OH MY GOD mode uses 'omg_user' key */
+/** OH MY GOD mode — check both omg_user and omgplus_user */
 function getOmgUser() {
-  try {
-    const raw = localStorage.getItem('omg_user');
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed : null;
-  } catch {
-    return null;
+  for (const key of ['omg_user', 'omgplus_user']) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      // Direct format: { username, side }
+      if (parsed?.username) return parsed;
+      // Zustand wrapped: { state: { user: { username } } }
+      if (parsed?.state?.user?.username) return parsed.state.user;
+    } catch {}
   }
+  return null;
 }
 
 // ─── Banner ──────────────────────────────────────────────────────────────────
@@ -70,21 +74,21 @@ function OmgBanner() {
 function ProtectedRoute({ children }) {
   const user = getOmgUser();
   if (!user) {
-    return <Navigate to="login" replace />;
+    return <Navigate to="/v2/login" replace />;
   }
   return children;
 }
 
 function RootRedirect() {
   const user = getOmgUser();
-  return <Navigate to={user ? 'lobby' : 'login'} replace />;
+  return <Navigate to={user ? '/v2/lobby' : '/v2/login'} replace />;
 }
 
 function ProfileMeRedirect() {
   const user = getOmgUser();
   const name = user?.username?.trim();
-  if (!name) return <Navigate to="login" replace />;
-  return <Navigate to={`profile/${encodeURIComponent(name)}`} replace />;
+  if (!name) return <Navigate to="/v2/login" replace />;
+  return <Navigate to={`/v2/profile/${encodeURIComponent(name)}`} replace />;
 }
 
 // ─── OhMyGodApp ──────────────────────────────────────────────────────────────
@@ -260,9 +264,9 @@ export default function OhMyGodApp() {
           />
 
           {/* Aliases */}
-          <Route path="video-live" element={<Navigate to="../video" replace />} />
-          <Route path="knowledge-base" element={<Navigate to="../knowledge" replace />} />
-          <Route path="live-events" element={<Navigate to="../lobby" replace />} />
+          <Route path="video-live" element={<Navigate to="/v2/video" replace />} />
+          <Route path="knowledge-base" element={<Navigate to="/v2/knowledge" replace />} />
+          <Route path="live-events" element={<Navigate to="/v2/lobby" replace />} />
           <Route path="profile" element={<Navigate to="profile/me" replace />} />
 
           {/* Catch-all */}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 // ─── Inline styles (no external CSS dependency) ────────────────────────────
 
@@ -313,8 +314,8 @@ const NAV_CATEGORIES = [
     label: 'ויכוח',
     items: [
       { label: 'לובי', path: '/lobby' },
-      { label: 'ויכוחים חיים', path: '/live-debates' },
-      { label: 'ארכיב', path: '/archive' },
+      { label: 'ויכוחים חיים', path: '/live-events' },
+      { label: 'ארכיב', path: '/knowledge' },
     ],
   },
   {
@@ -322,8 +323,9 @@ const NAV_CATEGORIES = [
     emoji: '🙏',
     label: 'אמונה',
     items: [
-      { label: "צ'אט אמונה", path: '/faith-chat' },
-      { label: 'תנ"ך ושאלות', path: '/bible' },
+      { label: "צ'אט אמונה", path: '/faith' },
+      { label: 'תנ"ך ושאלות', path: '/faith' },
+      { label: 'טיעונים', path: '/arguments' },
     ],
   },
   {
@@ -331,8 +333,8 @@ const NAV_CATEGORIES = [
     emoji: '🤖',
     label: 'AI',
     items: [
-      { label: 'ויכוח עם AI', path: '/ai-debate' },
-      { label: 'סימולטור קולי', path: '/voice-simulator' },
+      { label: 'ויכוח עם AI', path: '/lobby' },
+      { label: 'סימולטור קולי', path: '/ai-voice' },
     ],
   },
   {
@@ -342,7 +344,7 @@ const NAV_CATEGORIES = [
     items: [
       { label: 'רדיו', path: '/radio' },
       { label: 'פודקאסט', path: '/podcast' },
-      { label: 'טלוויזיה', path: '/tv' },
+      { label: 'טלוויזיה', path: '/video-live' },
     ],
   },
   {
@@ -352,7 +354,7 @@ const NAV_CATEGORIES = [
     items: [
       { label: 'בלוג', path: '/blog' },
       { label: 'לוח מובילים', path: '/leaderboard' },
-      { label: 'חברים', path: '/friends' },
+      { label: 'חברים', path: '/registered' },
     ],
   },
 ];
@@ -484,6 +486,7 @@ function ActionButton({ emoji, label, onClick, danger }) {
 // ─── Main component ────────────────────────────────────────────────────────
 
 export default function AppHeader({ user, onNavigate }) {
+  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -492,7 +495,7 @@ export default function AppHeader({ user, onNavigate }) {
   // Resolve user from prop or localStorage
   const resolvedUser = user || (() => {
     try {
-      return JSON.parse(localStorage.getItem('omg_user') || '{}');
+      return JSON.parse(localStorage.getItem('omgplus_user') || '{}');
     } catch {
       return {};
     }
@@ -536,21 +539,16 @@ export default function AppHeader({ user, onNavigate }) {
     if (onNavigate) {
       onNavigate(path);
     } else {
-      // fallback: native navigation
-      window.location.hash = path;
+      navigate(path);
     }
-  }, [onNavigate]);
+  }, [onNavigate, navigate]);
 
   const handleLogout = useCallback(() => {
     setMenuOpen(false);
-    localStorage.removeItem('omg_user');
-    localStorage.removeItem('token');
-    if (onNavigate) {
-      onNavigate('/login');
-    } else {
-      window.location.hash = '/login';
-    }
-  }, [onNavigate]);
+    localStorage.removeItem('omgplus_user');
+    localStorage.removeItem('omgplus_store');
+    navigate('/login');
+  }, [navigate]);
 
   const avatarLetter = username.charAt(0).toUpperCase();
 

@@ -22,6 +22,19 @@ export default function ModeSwitcher() {
     if (mode === '1') {
       navigate('/lobby');
     } else {
+      // When switching to Mode 2, copy the session from omgplus_user → omg_user
+      // so the user doesn't need to log in again
+      try {
+        const v1User = localStorage.getItem('omgplus_user');
+        if (v1User) {
+          const parsed = JSON.parse(v1User);
+          // Handle both direct format and Zustand-wrapped format
+          const user = parsed?.state?.user ?? parsed;
+          if (user?.username) {
+            localStorage.setItem('omg_user', JSON.stringify(user));
+          }
+        }
+      } catch {}
       navigate('/v2/lobby');
     }
   }

@@ -1,1 +1,6 @@
-.vercel
+﻿node_modules/
+client/node_modules/
+client/dist/
+.vercel/
+server/store-snapshot.json
+.env

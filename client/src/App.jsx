@@ -1,6 +1,5 @@
-import React, { useEffect, useLayoutEffect, useState, useCallback } from 'react';
-import { BrowserRouter, HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { Capacitor } from '@capacitor/core';
+import React, { useEffect, useLayoutEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAppStore, rehydrateUserIfNeeded } from './store/appStore.js';
 import { connectSocket, disconnectSocket } from './socket.js';
 import AppHeader from './components/layout/AppHeader.jsx';
@@ -191,11 +190,6 @@ function ProtectedShell({ children }) {
 // ─── App ─────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const AppRouter = React.useMemo(
-    () => (Capacitor.isNativePlatform() ? HashRouter : BrowserRouter),
-    [],
-  );
-
   // Zustand store — kept for socket connection logic and backward compat
   const user = useAppStore(s => s.user);
   const socketUsername = user?.username;
@@ -211,9 +205,8 @@ export default function App() {
     rehydrateUserIfNeeded();
   }, []);
 
-  // Browser-only shell class for consistent column layout
+  // Browser shell class for consistent column layout
   useEffect(() => {
-    if (Capacitor.isNativePlatform()) return undefined;
     document.documentElement.classList.add('app-shell-browser');
     return () => document.documentElement.classList.remove('app-shell-browser');
   }, []);
@@ -228,7 +221,7 @@ export default function App() {
   }, [socketUsername, socketSide]);
 
   return (
-    <AppRouter>
+    <BrowserRouter>
       <RadioAudioProvider>
         <AppErrorBoundary>
           <Routes>
@@ -424,6 +417,6 @@ export default function App() {
           </Routes>
         </AppErrorBoundary>
       </RadioAudioProvider>
-    </AppRouter>
+    </BrowserRouter>
   );
 }

@@ -1,16 +1,14 @@
 import React, {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from 'react';
-import { Capacitor } from '@capacitor/core';
 import { ISRAELI_RADIO_STATIONS } from '../data/israeliRadioStations.js';
 import { getApiBaseUrl } from '../lib/apiBaseUrl.js';
 import { displayStationNameHebrewPrefer } from '../lib/radioStationDisplayName.js';
 import { sortIsraelRadioStationsForMenu, radioStationIsraelMenuPriority } from '../lib/radioStationIsraelOrder.js';
-import { RadioPlayer } from '../lib/nativeRadioPlugin.js';
 
-// On Android Capacitor we hand actual audio to the native Foreground Service.
-// HTML5 audio stays muted on Android (handles UI state only).
-const IS_ANDROID_NATIVE = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+// Web-only (no native Capacitor support in OMG-PLUS)
+const IS_ANDROID_NATIVE = false;
+const RadioPlayer = { start: () => Promise.resolve(), stop: () => Promise.resolve(), setVolume: () => Promise.resolve() };
 
 const RadioAudioContext = createContext(null);
 

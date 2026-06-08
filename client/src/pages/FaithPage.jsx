@@ -144,15 +144,18 @@ const styles = {
     cursor: 'pointer',
     fontFamily: 'inherit',
     fontSize: '0.9rem',
-    fontWeight: active ? 700 : 400,
+    fontWeight: active ? 700 : 500,
     whiteSpace: 'nowrap',
     transition: 'all 0.2s',
     background: active
       ? 'linear-gradient(180deg, #3d1a6e 0%, #2a0f50 100%)'
       : 'rgba(255,255,255,0.04)',
     color: active ? '#d4af37' : '#9b7ec8',
-    borderBottom: active ? '2px solid #d4af37' : '2px solid transparent',
-    boxShadow: active ? '0 -2px 12px rgba(212,175,55,0.15)' : 'none'
+    borderBottom: active ? '3px solid #d4af37' : '3px solid transparent',
+    boxShadow: active ? '0 -2px 12px rgba(212,175,55,0.2)' : 'none',
+    textDecoration: active ? 'underline' : 'none',
+    textDecorationColor: active ? 'rgba(212,175,55,0.5)' : 'transparent',
+    textUnderlineOffset: '3px',
   }),
   content: {
     maxWidth: '820px',
@@ -738,13 +741,98 @@ function RabbiQA() {
   );
 }
 
+const SHABBAT_FALLBACK = [
+  { city: 'ירושלים', entry: '18:30', exit: null },
+  { city: 'תל אביב', entry: '19:00', exit: null },
+  { city: 'חיפה', entry: '18:45', exit: null },
+  { city: 'באר שבע', entry: '19:10', exit: null },
+];
+
+function parseCandleLighting(items) {
+  if (!Array.isArray(items)) return null;
+  const candle = items.find(it => it.category === 'candles' || it.title?.includes('הדלקת'));
+  const havdalah = items.find(it => it.category === 'havdalah' || it.title?.includes('הבדלה'));
+  if (!candle) return null;
+  const parseTime = (dt) => {
+    if (!dt) return null;
+    try {
+      const d = new Date(dt);
+      if (isNaN(d.getTime())) return null;
+      return d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false });
+    } catch { return null; }
+  };
+  return { entry: parseTime(candle.date), exit: havdalah ? parseTime(havdalah.date) : null };
+}
+
+const HEBCAL_CITY_CONFIGS = [
+  { city: 'ירושלים', geo: 'city', city_id: 'Jerusalem' },
+  { city: 'תל אביב', geo: 'city', city_id: 'Tel_Aviv' },
+  { city: 'חיפה', geo: 'city', city_id: 'Haifa' },
+  { city: 'באר שבע', geo: 'city', city_id: 'Beersheba' },
+];
+
+async function fetchHebcalCity(cityId, signal) {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth() + 1;
+  const url = `https://www.hebcal.com/shabbat?cfg=json&city=${cityId}&m=50&year=${year}&month=${month}`;
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  return parseCandleLighting(data?.items);
+}
+
 function ShabbatTimes() {
   const today = new Date();
-  const dayNames = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
   const dayOfWeek = today.getDay();
   const daysUntilFriday = (5 - dayOfWeek + 7) % 7 || 7;
   const nextFriday = new Date(today);
   nextFriday.setDate(today.getDate() + (dayOfWeek === 5 ? 0 : daysUntilFriday));
+
+  const [times, setTimes] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setFetchError(false);
+
+    const controllers = HEBCAL_CITY_CONFIGS.map(() => new AbortController());
+    const timeoutIds = controllers.map((ctrl) =>
+      setTimeout(() => ctrl.abort(), 5000)
+    );
+
+    Promise.all(
+      HEBCAL_CITY_CONFIGS.map((cfg, i) =>
+        fetchHebcalCity(cfg.city_id, controllers[i].signal)
+          .then(result => ({ city: cfg.city, result }))
+          .catch(() => ({ city: cfg.city, result: null }))
+      )
+    ).then(results => {
+      if (cancelled) return;
+      const anySuccess = results.some(r => r.result !== null);
+      if (!anySuccess) {
+        setFetchError(true);
+        setTimes(null);
+      } else {
+        setTimes(results);
+        setFetchError(false);
+      }
+      setLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+      timeoutIds.forEach(id => clearTimeout(id));
+      controllers.forEach(ctrl => { try { ctrl.abort(); } catch { /* ignore */ } });
+    };
+  }, [retryKey]);
+
+  const displayTimes = fetchError || !times
+    ? SHABBAT_FALLBACK.map(f => ({ city: f.city, result: { entry: f.entry, exit: f.exit } }))
+    : times;
 
   return (
     <div>
@@ -755,24 +843,67 @@ function ShabbatTimes() {
         שבת פרשת השבוע |{' '}
         {nextFriday.toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'long' })}
       </div>
-      <div style={styles.shabbatGrid}>
-        {SHABBAT_TIMES.map((item, i) => (
-          <div key={i} style={styles.shabbatCard}>
-            <div style={styles.shabbatCity}>{item.city}</div>
-            <div style={styles.shabbatRow}>
-              <span style={styles.shabbatLabel}>כניסת שבת:</span>
-              <span style={styles.shabbatTime}>{item.entry}</span>
-            </div>
-            <div style={styles.shabbatRow}>
-              <span style={styles.shabbatLabel}>צאת שבת:</span>
-              <span style={styles.shabbatTime}>{item.exit}</span>
-            </div>
+
+      {loading && (
+        <div style={{ textAlign: 'center', color: '#9b7ec8', padding: '20px', fontSize: '0.88rem' }}>
+          טוען זמני שבת...
+        </div>
+      )}
+
+      {!loading && fetchError && (
+        <div style={{ textAlign: 'center', marginBottom: '12px' }}>
+          <div style={{ color: '#e8b84b', fontSize: '0.82rem', marginBottom: '8px' }}>
+            לא ניתן לטעון זמנים עדכניים — מוצגים זמנים משוערים
           </div>
-        ))}
-      </div>
-      <div style={styles.shabbatNote}>
-        * הזמנים הם קירוב לשבוע הנוכחי. לזמנים מדויקים עיין בלוח זמנים הלכתי.
-      </div>
+          <button
+            style={{
+              background: 'rgba(212,175,55,0.15)',
+              border: '1px solid rgba(212,175,55,0.4)',
+              color: '#d4af37',
+              borderRadius: '6px',
+              padding: '6px 16px',
+              cursor: 'pointer',
+              fontSize: '0.82rem',
+              fontFamily: 'inherit',
+              fontWeight: 600,
+            }}
+            onClick={() => setRetryKey(k => k + 1)}
+          >
+            נסה שוב
+          </button>
+        </div>
+      )}
+
+      {!loading && (
+        <>
+          <div style={styles.shabbatGrid}>
+            {displayTimes.map((item, i) => {
+              const entry = item.result?.entry || '—';
+              const exit = item.result?.exit || null;
+              return (
+                <div key={i} style={styles.shabbatCard}>
+                  <div style={styles.shabbatCity}>{item.city}</div>
+                  <div style={styles.shabbatRow}>
+                    <span style={styles.shabbatLabel}>כניסת שבת:</span>
+                    <span style={styles.shabbatTime}>{entry}</span>
+                  </div>
+                  {exit && (
+                    <div style={styles.shabbatRow}>
+                      <span style={styles.shabbatLabel}>צאת שבת:</span>
+                      <span style={styles.shabbatTime}>{exit}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div style={styles.shabbatNote}>
+            {fetchError
+              ? 'זמנים משוערים — אנא בדקו לוח שנה מקומי'
+              : '* הזמנים נטענים מ-Hebcal. לזמנים מדויקים עיין בלוח זמנים הלכתי.'}
+          </div>
+        </>
+      )}
     </div>
   );
 }

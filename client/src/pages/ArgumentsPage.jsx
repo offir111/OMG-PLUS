@@ -1474,7 +1474,7 @@ export default function ArgumentsPage({
               className="btn-clear-search"
               onClick={() => { setSearchQuery(''); clearAiState(); }}
               aria-label="נקה חיפוש"
-            >נקה</button>
+            >✕</button>
           )}
         </div>
       </div>
@@ -2824,6 +2824,82 @@ export default function ArgumentsPage({
           .args-col:last-child { border-bottom: none; }
           .editors-grid { grid-template-columns: 1fr; }
         }
+        .btn-clear-search {
+          flex-shrink: 0;
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          border: 1px solid rgba(255,255,255,0.18);
+          background: rgba(255,255,255,0.07);
+          color: rgba(220,220,230,0.85);
+          font-size: 1rem;
+          font-weight: 700;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0;
+          line-height: 1;
+          transition: background 0.15s, color 0.15s;
+        }
+        .btn-clear-search:hover {
+          background: rgba(255,80,80,0.18);
+          color: #fca5a5;
+          border-color: rgba(255,100,100,0.4);
+        }
+        .args-search-count {
+          direction: rtl;
+          font-size: 0.78rem;
+          color: rgba(148,163,184,0.85);
+          font-weight: 600;
+          padding: 6px 4px 2px;
+          max-width: 960px;
+          margin: 0 auto;
+        }
+        .args-search-count strong {
+          color: #a5b4fc;
+        }
+        .args-empty-state {
+          direction: rtl;
+          text-align: center;
+          padding: 48px 24px 56px;
+          max-width: 520px;
+          margin: 0 auto;
+        }
+        .args-empty-icon {
+          font-size: 3rem;
+          margin-bottom: 14px;
+          opacity: 0.55;
+        }
+        .args-empty-title {
+          font-size: 1rem;
+          font-weight: 700;
+          color: rgba(226,232,240,0.82);
+          margin-bottom: 8px;
+        }
+        .args-empty-query {
+          color: #a5b4fc;
+        }
+        .args-empty-hint {
+          font-size: 0.8rem;
+          color: var(--muted);
+          line-height: 1.6;
+        }
+        .args-empty-clear-btn {
+          margin-top: 18px;
+          padding: 9px 22px;
+          border-radius: 999px;
+          border: 1px solid rgba(165,180,252,0.35);
+          background: rgba(99,102,241,0.12);
+          color: #a5b4fc;
+          font-size: 0.84rem;
+          font-weight: 700;
+          cursor: pointer;
+          transition: background 0.15s;
+        }
+        .args-empty-clear-btn:hover {
+          background: rgba(99,102,241,0.22);
+        }
       `}</style>
 
       <div className="args-page">
@@ -2999,65 +3075,99 @@ export default function ArgumentsPage({
               {`ע״פ האמונה — לאלוהים אין זמן ואין מקום אין לו גם יוצר — המונח אלוהים מוזכר בתנ״ך למעלה מ־2600 פעמים, והשם המפורש, יהוה, מוזכר למעלה מ־6800 פעמים, כאשר השם המלא יהוה בדרך כלל מוחלף בקריאה במילה אדוני — (ע״פ בדיקת AI).`}
             </p>
           )}
-          <div className="args-columns">
-            {/* Pro — belief */}
-            <div className="args-col col-pro">
-              <div className="args-col-title">{columnTitles.pro}</div>
-              {getArgs(activeCategory, 'pro').map((arg, i) => (
-                <div className="arg-card" key={i}>
-                  <div>{arg.text}</div>
-                  <div className="arg-card-author">
-                    {SPECIAL_RABBIS.includes(arg.author) && <span className="special-badge badge-rabbi">🕍 רב</span>}
-                    {SPECIAL_SCIENTISTS.includes(arg.author) && <span className="special-badge badge-scientist">🔬 מדען</span>}
-                    {arg.author}
+          {(() => {
+            const proArgs = getArgs(activeCategory, 'pro');
+            const conArgs = getArgs(activeCategory, 'con');
+            const totalResults = proArgs.length + conArgs.length;
+            const hasActiveSearch = normalizedSearch.length > 0 && !showKnowledgeAiAssistant;
+            const noResults = hasActiveSearch && totalResults === 0;
+            return (
+              <>
+                {hasActiveSearch && (
+                  <div className="args-search-count">
+                    {noResults
+                      ? null
+                      : <>נמצאו <strong>{totalResults}</strong> תוצאות</>
+                    }
                   </div>
-                </div>
-              ))}
-              {isSpecial && (
-                <div className="args-special">
-                  <div className="args-special-title">
-                    {isRabbi ? '🕍 הוסף טענה בעד אמונה' : '🔬 הוסף טענה בעד אמונה'}
+                )}
+                {noResults ? (
+                  <div className="args-empty-state">
+                    <div className="args-empty-icon">&#128269;</div>
+                    <div className="args-empty-title">
+                      לא נמצאו תוצאות עבור &ldquo;<span className="args-empty-query">{searchQuery.trim()}</span>&rdquo;
+                    </div>
+                    <div className="args-empty-hint">נסה מילת חיפוש אחרת, או נקה את החיפוש כדי לראות את כל הטענות.</div>
+                    <button
+                      type="button"
+                      className="args-empty-clear-btn"
+                      onClick={() => { setSearchQuery(''); clearAiState(); }}
+                    >&#10005; נקה חיפוש</button>
                   </div>
-                  <textarea
-                    className="args-add-input"
-                    placeholder="כתוב את הטענה כאן..."
-                    value={newPro}
-                    onChange={e => setNewPro(e.target.value)}
-                  />
-                  <button className="args-add-btn btn-pro" onClick={() => addArg('pro')}>➕ הוסף</button>
-                </div>
-              )}
-            </div>
+                ) : (
+                  <div className="args-columns">
+                    {/* Pro — belief */}
+                    <div className="args-col col-pro">
+                      <div className="args-col-title">{columnTitles.pro}</div>
+                      {proArgs.map((arg, i) => (
+                        <div className="arg-card" key={i}>
+                          <div>{arg.text}</div>
+                          <div className="arg-card-author">
+                            {SPECIAL_RABBIS.includes(arg.author) && <span className="special-badge badge-rabbi">&#128333; רב</span>}
+                            {SPECIAL_SCIENTISTS.includes(arg.author) && <span className="special-badge badge-scientist">&#128300; מדען</span>}
+                            {arg.author}
+                          </div>
+                        </div>
+                      ))}
+                      {isSpecial && (
+                        <div className="args-special">
+                          <div className="args-special-title">
+                            {isRabbi ? '🕍 הוסף טענה בעד אמונה' : '🔬 הוסף טענה בעד אמונה'}
+                          </div>
+                          <textarea
+                            className="args-add-input"
+                            placeholder="כתוב את הטענה כאן..."
+                            value={newPro}
+                            onChange={e => setNewPro(e.target.value)}
+                          />
+                          <button className="args-add-btn btn-pro" onClick={() => addArg('pro')}>➕ הוסף</button>
+                        </div>
+                      )}
+                    </div>
 
-            {/* Con — science */}
-            <div className="args-col col-con">
-              <div className="args-col-title">{columnTitles.con}</div>
-              {getArgs(activeCategory, 'con').map((arg, i) => (
-                <div className="arg-card" key={i}>
-                  <div>{arg.text}</div>
-                  <div className="arg-card-author">
-                    {SPECIAL_RABBIS.includes(arg.author) && <span className="special-badge badge-rabbi">🕍 רב</span>}
-                    {SPECIAL_SCIENTISTS.includes(arg.author) && <span className="special-badge badge-scientist">🔬 מדען</span>}
-                    {arg.author}
+                    {/* Con — science */}
+                    <div className="args-col col-con">
+                      <div className="args-col-title">{columnTitles.con}</div>
+                      {conArgs.map((arg, i) => (
+                        <div className="arg-card" key={i}>
+                          <div>{arg.text}</div>
+                          <div className="arg-card-author">
+                            {SPECIAL_RABBIS.includes(arg.author) && <span className="special-badge badge-rabbi">🕍 רב</span>}
+                            {SPECIAL_SCIENTISTS.includes(arg.author) && <span className="special-badge badge-scientist">🔬 מדען</span>}
+                            {arg.author}
+                          </div>
+                        </div>
+                      ))}
+                      {isSpecial && (
+                        <div className="args-special">
+                          <div className="args-special-title">
+                            {isScientist ? '🔬 הוסף טענה מדעית' : '🕍 הוסף טענה מדעית'}
+                          </div>
+                          <textarea
+                            className="args-add-input"
+                            placeholder="כתוב את הטענה כאן..."
+                            value={newCon}
+                            onChange={e => setNewCon(e.target.value)}
+                          />
+                          <button className="args-add-btn btn-con" onClick={() => addArg('con')}>➕ הוסף</button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-              {isSpecial && (
-                <div className="args-special">
-                  <div className="args-special-title">
-                    {isScientist ? '🔬 הוסף טענה מדעית' : '🕍 הוסף טענה מדעית'}
-                  </div>
-                  <textarea
-                    className="args-add-input"
-                    placeholder="כתוב את הטענה כאן..."
-                    value={newCon}
-                    onChange={e => setNewCon(e.target.value)}
-                  />
-                  <button className="args-add-btn btn-con" onClick={() => addArg('con')}>➕ הוסף</button>
-                </div>
-              )}
-            </div>
-          </div>
+                )}
+              </>
+            );
+          })()}
         </>
         )}
 

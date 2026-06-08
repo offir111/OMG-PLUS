@@ -37,6 +37,7 @@ const IL_CHANNELS = [
   {
     id: 'i24heb', name: 'i24 NEWS עברית', flag: '🇮🇱',
     hlsUrl: 'https://bcovlive-a.akamaihd.net/d89ede8094c741b7924120b27764153c/eu-central-1/5377161796001/profile_0/chunklist.m3u8',
+    maybeDown: true,
   },
   {
     id: 'hidabroot', name: 'הידברות', flag: '🇮🇱',
@@ -64,6 +65,7 @@ const WORLD_CHANNELS = [
   {
     id: 'bloomberg', name: 'Bloomberg', flag: '🇺🇸',
     hlsUrl: 'https://bloomberg.com/media-manifest/streams/us.m3u8',
+    maybeDown: true,
   },
   {
     id: 'euronews', name: 'Euronews', flag: '🇪🇺',
@@ -91,8 +93,9 @@ function HLSPlayer({ src, channelName, muted, onUnmute, watchUrl }) {
   const videoRef     = useRef(null);
   const containerRef = useRef(null);
   const hlsRef       = useRef(null);
-  const [status,  setStatus]  = useState('loading');
-  const [isFs,    setIsFs]    = useState(false);
+  const [status,    setStatus]    = useState('loading');
+  const [isFs,      setIsFs]      = useState(false);
+  const [retryKey,  setRetryKey]  = useState(0);
 
   useEffect(() => {
     const onFsChange = () => setIsFs(!!document.fullscreenElement);
@@ -126,7 +129,7 @@ function HLSPlayer({ src, channelName, muted, onUnmute, watchUrl }) {
     } else {
       setStatus('error');
     }
-  }, [src]);
+  }, [src, retryKey]);
 
   // keep video.muted in sync with prop
   useEffect(() => {
@@ -143,29 +146,49 @@ function HLSPlayer({ src, channelName, muted, onUnmute, watchUrl }) {
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%', background: '#000', borderRadius: 'inherit' }}>
       {status === 'loading' && (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, zIndex: 2 }}>
-          <span style={{ fontSize: '2rem' }}>📡</span>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, zIndex: 2, background: 'rgba(0,0,0,0.7)' }}>
+          <span style={{ fontSize: '2rem', animation: 'tvPulse 1.4s ease-in-out infinite' }}>📡</span>
           <span style={{ fontSize: '0.85rem', color: '#e2e8f0', fontWeight: 700 }}>מתחבר לשידור…</span>
           <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{channelName}</span>
         </div>
       )}
       {status === 'error' && (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, zIndex: 2, padding: '0 16px', textAlign: 'center' }}>
-          <span style={{ fontSize: '2rem' }}>📵</span>
-          <span style={{ fontSize: '0.85rem', color: '#fca5a5', fontWeight: 700 }}>השידור לא זמין דרך הפרוקסי</span>
-          {watchUrl ? (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, zIndex: 2, padding: '0 16px', textAlign: 'center', background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)' }}>
+          <span style={{ fontSize: '2.2rem' }}>📺</span>
+          <span style={{ fontSize: '0.9rem', color: '#fca5a5', fontWeight: 800 }}>הערוץ אינו זמין כרגע</span>
+          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>נסה ערוץ אחר או חזור מאוחר יותר</span>
+          <button
+            type="button"
+            onClick={() => { setStatus('loading'); setRetryKey(k => k + 1); }}
+            style={{
+              marginTop: 6,
+              padding: '7px 20px',
+              borderRadius: 8,
+              background: 'rgba(99,102,241,0.22)',
+              border: '1.5px solid rgba(99,102,241,0.55)',
+              color: '#a5b4fc',
+              fontSize: '0.8rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+            }}
+          >
+            🔄 נסה שוב
+          </button>
+          {watchUrl && (
             <a
               href={watchUrl}
               target="_blank"
               rel="noopener noreferrer"
               style={{
-                marginTop: 4,
-                padding: '8px 18px',
+                padding: '7px 18px',
                 borderRadius: 8,
                 background: 'rgba(251,191,36,0.18)',
                 border: '1.5px solid rgba(251,191,36,0.55)',
                 color: '#fbbf24',
-                fontSize: '0.8rem',
+                fontSize: '0.78rem',
                 fontWeight: 800,
                 textDecoration: 'none',
                 display: 'inline-flex',
@@ -175,8 +198,6 @@ function HLSPlayer({ src, channelName, muted, onUnmute, watchUrl }) {
             >
               צפייה ישירה באתר ↗
             </a>
-          ) : (
-            <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>נסה ערוץ אחר</span>
           )}
         </div>
       )}
@@ -449,8 +470,10 @@ export default function VideoLivePage() {
             {IL_CHANNELS.map(ch => (
               <button key={ch.id} type="button"
                 className={'tv-ch-btn' + (!ytTvUrl && activeCh.id === ch.id ? ' tv-ch-btn--active' : '')}
-                onClick={() => { setActiveCh(ch); setYtTvUrl(null); }}>
+                onClick={() => { setActiveCh(ch); setYtTvUrl(null); }}
+                title={ch.maybeDown ? 'ייתכן שהערוץ אינו זמין כרגע' : undefined}>
                 {ch.flag} {ch.name}
+                {ch.maybeDown && <span style={{ marginRight: 'auto', marginLeft: 2, fontSize: '0.55rem', color: '#f97316', fontWeight: 900, flexShrink: 0 }}>⚠</span>}
               </button>
             ))}
           </div>
@@ -459,8 +482,10 @@ export default function VideoLivePage() {
             {WORLD_CHANNELS.map(ch => (
               <button key={ch.id} type="button"
                 className={'tv-ch-btn' + (!ytTvUrl && activeCh.id === ch.id ? ' tv-ch-btn--active' : '')}
-                onClick={() => { setActiveCh(ch); setYtTvUrl(null); }}>
+                onClick={() => { setActiveCh(ch); setYtTvUrl(null); }}
+                title={ch.maybeDown ? 'ייתכן שהערוץ אינו זמין כרגע' : undefined}>
                 {ch.flag} {ch.name}
+                {ch.maybeDown && <span style={{ marginRight: 'auto', marginLeft: 2, fontSize: '0.55rem', color: '#f97316', fontWeight: 900, flexShrink: 0 }}>⚠</span>}
               </button>
             ))}
           </div>

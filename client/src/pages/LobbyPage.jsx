@@ -24,7 +24,7 @@ const AI_PERSONAS = [
 ];
 
 /* ─── Animated dots ─────────────────────────────────────────────────────────── */
-function ConnectingDots() {
+function ConnectingDots({ pulse }) {
   return (
     <span style={{ display: 'inline-flex', gap: 7, alignItems: 'center', marginTop: 10 }}>
       {[0, 1, 2, 3, 4].map(i => (
@@ -32,9 +32,12 @@ function ConnectingDots() {
           key={i}
           style={{
             width: 10, height: 10, borderRadius: '50%',
-            background: 'var(--gold, #f59e0b)',
+            background: pulse ? '#f87171' : 'var(--gold, #f59e0b)',
             display: 'inline-block',
-            animation: `omgDotPulse 1.1s ease-in-out ${i * 0.18}s infinite`,
+            animation: pulse
+              ? `omgDotPulse 0.65s ease-in-out ${i * 0.12}s infinite`
+              : `omgDotPulse 1.1s ease-in-out ${i * 0.18}s infinite`,
+            transition: 'background 0.4s',
           }}
         />
       ))}
@@ -195,9 +198,10 @@ function PersonaPicker({ onSelect, onBack, userSide }) {
 }
 
 /* ─── Waiting shell (human search) ──────────────────────────────────────────── */
-function WaitingShell({ user, queuePosition, waitSeconds, showAiOffer, onAiAccept, onAiDecline, onCancel }) {
+function WaitingShell({ user, queuePosition, waitSeconds, estimatedWait, showAiOffer, onAiAccept, onAiDecline, onCancel }) {
   const oppSide = user?.side === 'believer' ? 'atheist' : 'believer';
   const oppLabel = oppSide === 'believer' ? 'מאמין' : 'אתאיסט';
+  const longWait = waitSeconds >= 30;
 
   const formatTime = (s) => {
     const m = Math.floor(s / 60);
@@ -222,23 +226,44 @@ function WaitingShell({ user, queuePosition, waitSeconds, showAiOffer, onAiAccep
         <AiOfferDialog onAccept={onAiAccept} onDecline={onAiDecline} />
       )}
 
-      <div style={{ fontSize: '3.5rem', marginBottom: 12 }}>🔍</div>
+      <div
+        style={{
+          fontSize: '3.5rem',
+          marginBottom: 12,
+          animation: longWait ? 'omgSearchPulse 1.8s ease-in-out infinite' : 'none',
+        }}
+      >
+        🔍
+        <style>{`
+          @keyframes omgSearchPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.18); opacity: 0.7; }
+          }
+        `}</style>
+      </div>
       <h2 style={{ margin: '0 0 6px', fontSize: '1.4rem', fontWeight: 900 }}>
         מחפש יריב {oppLabel}…
       </h2>
-      <ConnectingDots />
+      <ConnectingDots pulse={longWait} />
+
+      {longWait && (
+        <p style={{ marginTop: 10, color: 'var(--muted, #aaa)', fontSize: '0.85rem', lineHeight: 1.5 }}>
+          לוקח קצת זמן… אפשר גם להתפלמס מול AI
+        </p>
+      )}
 
       <div
         style={{
-          marginTop: 28,
+          marginTop: 24,
           display: 'flex',
           flexDirection: 'column',
           gap: 10,
           background: 'var(--surface, #1e1e2e)',
-          border: '1px solid var(--border, #333)',
+          border: `1px solid ${longWait ? '#f8717144' : 'var(--border, #333)'}`,
           borderRadius: 16,
           padding: '20px 32px',
           minWidth: 200,
+          transition: 'border-color 0.6s',
         }}
       >
         <div>
@@ -251,6 +276,14 @@ function WaitingShell({ user, queuePosition, waitSeconds, showAiOffer, onAiAccep
           <span style={{ color: 'var(--muted, #888)', fontSize: '0.82rem' }}>זמן המתנה</span>
           <div style={{ fontSize: '1.4rem', fontWeight: 700 }}>{formatTime(waitSeconds)}</div>
         </div>
+        {estimatedWait != null && (
+          <div>
+            <span style={{ color: 'var(--muted, #888)', fontSize: '0.82rem' }}>זמן משוער</span>
+            <div style={{ fontSize: '1rem', fontWeight: 600, color: '#86efac' }}>
+              ~{formatTime(estimatedWait)}
+            </div>
+          </div>
+        )}
       </div>
 
       <button
@@ -331,6 +364,7 @@ export default function LobbyPage() {
   const [view, setView] = useState('idle'); // idle | waiting | persona-picker | waiting-ai | found
   const [queuePosition, setQueuePosition] = useState(null);
   const [waitSeconds, setWaitSeconds] = useState(0);
+  const [estimatedWait, setEstimatedWait] = useState(null);
   const [showAiOffer, setShowAiOffer] = useState(false);
   const [onlineCount, setOnlineCount] = useState(null);
   const [recentDebates, setRecentDebates] = useState([]);
@@ -339,6 +373,8 @@ export default function LobbyPage() {
   const matchActiveRef = useRef(false);
   const waitTimerRef = useRef(null);
   const offerTimerRef = useRef(null);
+  const viewRef = useRef(view);
+  useEffect(() => { viewRef.current = view; }, [view]);
 
   const quickAi = new URLSearchParams(location.search).get('ai') === '1';
   const quickHuman = new URLSearchParams(location.search).get('human') === '1';
@@ -347,7 +383,14 @@ export default function LobbyPage() {
 
   /* ── socket lifecycle ──────────────────────────────────────────────────── */
   useEffect(() => {
-    const onConnect = () => setConnected(true);
+    const onConnect = () => {
+      setConnected(true);
+      // Auto-rejoin queue if we were waiting when the socket dropped
+      if (viewRef.current === 'waiting' && resolvedUser?.username && resolvedUser?.side) {
+        socket.emit('join_queue', { username: resolvedUser.username, side: resolvedUser.side });
+        socket.emit('JOIN_QUEUE', { username: resolvedUser.username, side: resolvedUser.side });
+      }
+    };
     const onDisconnect = () => setConnected(false);
 
     const onMatchFound = ({ debateId, opponent, isAI, aiSide, believer, atheist, turn }) => {
@@ -368,7 +411,13 @@ export default function LobbyPage() {
     };
 
     // canonical server event
-    const onQueuePosition = ({ position }) => setQueuePosition(position);
+    const onQueuePosition = ({ position, estimatedWait: eta }) => {
+      setQueuePosition(position);
+      if (eta != null) setEstimatedWait(eta);
+    };
+
+    // estimated wait standalone event (some server versions)
+    const onEstimatedWait = ({ seconds }) => setEstimatedWait(seconds);
 
     // legacy aliases used by current server
     const onWaitingForOpponent = () => setView(v => v === 'idle' ? 'waiting' : v);
@@ -380,6 +429,8 @@ export default function LobbyPage() {
     socket.on('MATCH_FOUND', onMatchFound);
     socket.on('queue_position', onQueuePosition);
     socket.on('QUEUE_POSITION', onQueuePosition);
+    socket.on('estimated_wait', onEstimatedWait);
+    socket.on('ESTIMATED_WAIT', onEstimatedWait);
     socket.on('WAITING_FOR_OPPONENT', onWaitingForOpponent);
     socket.on('online_users', onOnlineUsers);
     socket.on('ONLINE_USERS', onOnlineUsers);
@@ -393,6 +444,8 @@ export default function LobbyPage() {
       socket.off('MATCH_FOUND', onMatchFound);
       socket.off('queue_position', onQueuePosition);
       socket.off('QUEUE_POSITION', onQueuePosition);
+      socket.off('estimated_wait', onEstimatedWait);
+      socket.off('ESTIMATED_WAIT', onEstimatedWait);
       socket.off('WAITING_FOR_OPPONENT', onWaitingForOpponent);
       socket.off('online_users', onOnlineUsers);
       socket.off('ONLINE_USERS', onOnlineUsers);
@@ -416,6 +469,7 @@ export default function LobbyPage() {
         setWaitSeconds(0);
         setQueuePosition(null);
         setShowAiOffer(false);
+        setEstimatedWait(null);
       }
       return;
     }
@@ -521,6 +575,7 @@ export default function LobbyPage() {
         user={resolvedUser}
         queuePosition={queuePosition}
         waitSeconds={waitSeconds}
+        estimatedWait={estimatedWait}
         showAiOffer={showAiOffer}
         onAiAccept={handleAiOfferAccept}
         onAiDecline={handleAiOfferDecline}

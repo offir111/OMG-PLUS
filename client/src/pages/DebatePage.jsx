@@ -34,6 +34,7 @@ export default function DebatePage() {
   const [debateEnded, setDebateEnded] = useState(false)
   const [results, setResults] = useState(null)
   const [streamingText, setStreamingText] = useState('')
+  const [opponentDisconnected, setOpponentDisconnected] = useState(false)
 
   // Voice phase state
   const [isRecording, setIsRecording] = useState(false)
@@ -64,6 +65,11 @@ export default function DebatePage() {
       setIsMyTurn(state.isMyTurn ?? true)
       setSpectatorCount(state.spectatorCount || 0)
       setCurrentDebate(state)
+
+      // Handle empty room — if no opponent present
+      if (state.participantCount !== undefined && state.participantCount < 2) {
+        setOpponentDisconnected(true)
+      }
     })
 
     socket.on('new_message', ({ from, text, isStreaming }) => {
@@ -119,12 +125,21 @@ export default function DebatePage() {
       setSpectatorCount(count)
     })
 
-    socket.on('debate_ended', ({ results: debateResults }) => {
+    socket.on('debate_ended', ({ results: debateResults, reason }) => {
+      // If ended due to disconnect, show disconnect modal instead of results screen
+      if (reason === 'disconnect' || reason === 'opponent_disconnected') {
+        setOpponentDisconnected(true)
+        return
+      }
       setResults(debateResults)
       setDebateEnded(true)
       setTimeout(() => {
         navigate('/lobby')
       }, 5000)
+    })
+
+    socket.on('opponent_disconnected', () => {
+      setOpponentDisconnected(true)
     })
 
     return () => {
@@ -137,6 +152,7 @@ export default function DebatePage() {
       socket.off('phase_change')
       socket.off('spectator_count')
       socket.off('debate_ended')
+      socket.off('opponent_disconnected')
     }
   }, [navigate, setCurrentDebate, user, streamingText])
 
@@ -398,6 +414,22 @@ export default function DebatePage() {
               </button>
               <button style={styles.dialogCancel} onClick={() => setShowEndConfirm(false)}>
                 ביטול
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Opponent disconnected modal */}
+      {opponentDisconnected && (
+        <div style={styles.dialogOverlay}>
+          <div style={styles.dialog}>
+            <div style={styles.disconnectIcon}>⚡</div>
+            <div style={styles.dialogTitle}>היריב התנתק</div>
+            <div style={styles.dialogText}>הדיון הסתיים כי היריב התנתק מהאפליקציה</div>
+            <div style={styles.dialogActions}>
+              <button style={styles.dialogConfirm} onClick={() => navigate('/lobby')}>
+                חזור ללובי
               </button>
             </div>
           </div>
@@ -707,6 +739,10 @@ const styles = {
     padding: '24px 28px',
     width: 280,
     textAlign: 'center'
+  },
+  disconnectIcon: {
+    fontSize: 40,
+    marginBottom: 8
   },
   dialogTitle: {
     fontSize: 18,

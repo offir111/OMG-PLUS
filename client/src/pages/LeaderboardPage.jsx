@@ -89,6 +89,10 @@ const shimmerKeyframes = `
   from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 @keyframes popIn {
   0%   { opacity: 0; transform: scale(0.85); }
   70%  { transform: scale(1.04); }
@@ -503,6 +507,8 @@ export default function LeaderboardPage() {
   const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 10;
 
   useEffect(() => {
     let cancelled = false;
@@ -531,7 +537,9 @@ export default function LeaderboardPage() {
   }, []);
 
   const top3 = leaders.slice(0, 3);
-  const rest = leaders.slice(3, 20);
+  const restAll = leaders.slice(3);
+  const totalPages = Math.max(1, Math.ceil(restAll.length / PAGE_SIZE));
+  const rest = restAll.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   return (
     <>
@@ -644,16 +652,23 @@ export default function LeaderboardPage() {
 
           {/* ── Full table ── */}
           <section>
-            <h2
-              style={{
-                margin: '0 0 16px',
-                fontSize: 18,
-                fontWeight: 800,
-                color: '#e2d9f3',
-              }}
-            >
-              📋 דירוג מלא
-            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: 18,
+                  fontWeight: 800,
+                  color: '#e2d9f3',
+                }}
+              >
+                📋 דירוג מלא
+              </h2>
+              {!loading && (
+                <span style={{ fontSize: 13, color: 'rgba(196,181,253,0.6)' }}>
+                  סה״כ {leaders.length} מתפלמסים רשומים
+                </span>
+              )}
+            </div>
 
             <div
               style={{
@@ -696,9 +711,12 @@ export default function LeaderboardPage() {
                       ))}
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody
+                    key={page}
+                    style={{ animation: 'pageFadeIn 0.3s ease both' }}
+                  >
                     {loading
-                      ? Array.from({ length: 17 }, (_, i) => (
+                      ? Array.from({ length: PAGE_SIZE }, (_, i) => (
                           <ShimmerRow key={i} index={i} />
                         ))
                       : rest.map((p, i) => (
@@ -708,6 +726,62 @@ export default function LeaderboardPage() {
                 </table>
               </div>
             </div>
+
+            {/* ── Pagination controls ── */}
+            {!loading && restAll.length > PAGE_SIZE && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 16,
+                  marginTop: 16,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <button
+                  onClick={() => setPage((p) => p - 1)}
+                  disabled={page === 0}
+                  style={{
+                    background: page === 0 ? 'rgba(255,255,255,0.05)' : 'rgba(150,80,255,0.2)',
+                    border: `1px solid ${page === 0 ? 'rgba(255,255,255,0.1)' : 'rgba(150,80,255,0.45)'}`,
+                    borderRadius: 10,
+                    padding: '8px 18px',
+                    color: page === 0 ? 'rgba(196,181,253,0.3)' : '#c084fc',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    cursor: page === 0 ? 'default' : 'pointer',
+                    transition: 'all 0.2s',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {'< הקודם'}
+                </button>
+
+                <span style={{ fontSize: 14, color: 'rgba(196,181,253,0.75)', fontWeight: 600 }}>
+                  עמוד {page + 1} מתוך {totalPages}
+                </span>
+
+                <button
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={page >= totalPages - 1}
+                  style={{
+                    background: page >= totalPages - 1 ? 'rgba(255,255,255,0.05)' : 'rgba(150,80,255,0.2)',
+                    border: `1px solid ${page >= totalPages - 1 ? 'rgba(255,255,255,0.1)' : 'rgba(150,80,255,0.45)'}`,
+                    borderRadius: 10,
+                    padding: '8px 18px',
+                    color: page >= totalPages - 1 ? 'rgba(196,181,253,0.3)' : '#c084fc',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    cursor: page >= totalPages - 1 ? 'default' : 'pointer',
+                    transition: 'all 0.2s',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {'הבא >'}
+                </button>
+              </div>
+            )}
           </section>
 
           {/* ── Hot Topics ── */}

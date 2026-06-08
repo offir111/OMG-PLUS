@@ -165,6 +165,16 @@ const styles = {
     marginBottom: '16px',
     textAlign: 'right',
   },
+  privateBanner: {
+    background: 'rgba(200, 150, 0, 0.18)',
+    border: '1px solid rgba(220, 170, 0, 0.5)',
+    borderRadius: '10px',
+    padding: '10px 14px',
+    color: '#ffd966',
+    fontSize: '0.82rem',
+    marginBottom: '16px',
+    textAlign: 'right',
+  },
   submitBtn: (loading) => ({
     width: '100%',
     padding: '13px',
@@ -299,6 +309,11 @@ function InputField({ label, hint, value, onChange, type = 'text', placeholder, 
   );
 }
 
+function isLocalStorageAvailable() {
+  try { localStorage.setItem('test', '1'); localStorage.removeItem('test'); return true; }
+  catch (e) { return false; }
+}
+
 export default function LoginPage() {
   const navigate = useNavigate();
 
@@ -309,8 +324,10 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({ total: null, online: null });
+  const [privateMode, setPrivateMode] = useState(false);
 
   useEffect(() => {
+    if (!isLocalStorageAvailable()) setPrivateMode(true);
     fetchStats();
     const interval = setInterval(fetchStats, 30000);
     return () => clearInterval(interval);
@@ -360,7 +377,11 @@ export default function LoginPage() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        const msg = data.message || data.error || (res.status === 409 ? 'שם המשתמש כבר קיים' : 'שגיאה בשרת, נסה שנית');
+        let msg;
+        if (res.status === 404) msg = 'שם המשתמש לא קיים';
+        else if (res.status === 401) msg = 'סיסמה שגויה';
+        else if (res.status === 409) msg = 'שם המשתמש כבר תפוס — בחר שם אחר';
+        else msg = data.message || data.error || 'שגיאה בשרת, נסה שנית';
         setError(msg);
         return;
       }
@@ -374,7 +395,7 @@ export default function LoginPage() {
       localStorage.setItem('omgplus_user', JSON.stringify(user));
       navigate('/lobby');
     } catch {
-      setError('לא ניתן להתחבר לשרת. בדוק את החיבור לאינטרנט');
+      setError('אין חיבור לשרת — בדוק את החיבור לאינטרנט');
     } finally {
       setLoading(false);
     }
@@ -414,6 +435,12 @@ export default function LoginPage() {
                   <span style={styles.statLabel}>מחוברים עכשיו</span>
                 </div>
               )}
+            </div>
+          )}
+
+          {privateMode && (
+            <div style={styles.privateBanner}>
+              ⚠️ הדפדפן שלך במצב פרטי — הנתונים לא יישמרו בין ביקורים
             </div>
           )}
 

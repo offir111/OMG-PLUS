@@ -105,6 +105,8 @@ function PostCard({
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [toast, setToast] = useState('');
+  // Inline confirmation state: null | 'permanent-hide' | 'pending-hide' | 'block'
+  const [confirmAction, setConfirmAction] = useState(null);
 
   const iLiked = username && likes.includes(username);
   const myPosition = username ? positions[username] : null;
@@ -184,26 +186,52 @@ function PostCard({
             opacity: chiefEditorVerified ? 1 : 0.92,
           }}
         >
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: '0.68rem', color: 'var(--muted)', fontWeight: 800, marginInlineEnd: 2 }}>עורך:</span>
-            <button type="button" style={editorBtn} disabled={editorDisabled} onClick={() => onChiefEditorAction('permanent-hide', p)}>
-              הסר פוסט
-            </button>
-            <button type="button" style={editorBtn} disabled={editorDisabled} onClick={() => onChiefEditorAction('pending-hide', p)}>
-              הסתר עד ברור
-            </button>
-            <button type="button" style={{ ...editorBtn, opacity: actionBusy ? 0.5 : 1 }} disabled={actionBusy} onClick={() => onChiefEditorAction('outreach', p)}>
-              פניה
-            </button>
-            <button type="button" style={editorBtn} disabled={editorDisabled} onClick={() => onChiefEditorAction('notify', p)}>
-              התראה ליוזר
-            </button>
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
-            <button type="button" style={{ ...editorBtn, borderColor: 'rgba(244,63,94,0.35)', color: '#fda4af' }} disabled={editorDisabled} onClick={() => onChiefEditorAction('block', p)}>
-              חסום כותב
-            </button>
-          </div>
+          {confirmAction ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', direction: 'rtl' }}>
+              <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text)' }}>
+                {confirmAction === 'permanent-hide' && 'להסיר את הפוסט לצמיתות?'}
+                {confirmAction === 'pending-hide' && 'להסתיר את הפוסט עד ברור?'}
+                {confirmAction === 'block' && 'לחסום את הכותב לצמיתות?'}
+              </span>
+              <button
+                type="button"
+                style={{ ...editorBtn, borderColor: 'rgba(244,63,94,0.55)', color: '#fda4af', background: 'rgba(244,63,94,0.12)' }}
+                onClick={() => { onChiefEditorAction(confirmAction, p); setConfirmAction(null); }}
+              >
+                כן
+              </button>
+              <button
+                type="button"
+                style={editorBtn}
+                onClick={() => setConfirmAction(null)}
+              >
+                לא
+              </button>
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: '0.68rem', color: 'var(--muted)', fontWeight: 800, marginInlineEnd: 2 }}>עורך:</span>
+                <button type="button" style={editorBtn} disabled={editorDisabled} onClick={() => setConfirmAction('permanent-hide')}>
+                  הסר פוסט
+                </button>
+                <button type="button" style={editorBtn} disabled={editorDisabled} onClick={() => setConfirmAction('pending-hide')}>
+                  הסתר עד ברור
+                </button>
+                <button type="button" style={{ ...editorBtn, opacity: actionBusy ? 0.5 : 1 }} disabled={actionBusy} onClick={() => onChiefEditorAction('outreach', p)}>
+                  פניה
+                </button>
+                <button type="button" style={editorBtn} disabled={editorDisabled} onClick={() => onChiefEditorAction('notify', p)}>
+                  התראה ליוזר
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+                <button type="button" style={{ ...editorBtn, borderColor: 'rgba(244,63,94,0.35)', color: '#fda4af' }} disabled={editorDisabled} onClick={() => setConfirmAction('block')}>
+                  חסום כותב
+                </button>
+              </div>
+            </>
+          )}
           {!chiefEditorVerified ? (
             <p style={{ margin: 0, fontSize: '0.65rem', color: 'var(--muted)', fontWeight: 600 }}>
               יש לאמת את האסימון מול השרת — רעננו את הדף או התחברו מחדש ב־«צור קשר».

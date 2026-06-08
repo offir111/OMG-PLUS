@@ -144,12 +144,22 @@ export default function RadioPage() {
   // Local state — which station is active in this page's UI
   const [activeId, setActiveId]     = useState(ctxStationId ?? STATIONS[0].id);
   const [playing, setPlaying]       = useState(false);
+  const [buffering, setBuffering]   = useState(false);
   const [streamError, setStreamError] = useState('');
   const [genre, setGenre]           = useState('הכל');
   const [favs, setFavs]             = useState(readFavs);
   const [showFavsOnly, setShowFavsOnly] = useState(false);
   const playGenRef = useRef(0);
   const radioAutoplayConsumedRef = useRef(false);
+
+  // Volume icon helper
+  const volumeIcon = useMemo(() => {
+    const pct = Math.round((volume ?? 0.85) * 100);
+    if (pct === 0) return '🔇';
+    if (pct <= 30) return '🔈';
+    if (pct <= 70) return '🔉';
+    return '🔊';
+  }, [volume]);
 
   // Keep playing state in sync with the global audio element
   const syncPlaying = useCallback(() => {
@@ -166,15 +176,25 @@ export default function RadioPage() {
     if (!a) return;
     const onErr = () => {
       if (!a.getAttribute('data-radio-src')) return;
-      setStreamError('לא ניתן לטעון את הזרם — נסו תחנה אחרת.');
+      setStreamError('תחנה זו אינה זמינה כרגע — נסה תחנה אחרת');
+      setBuffering(false);
     };
-    a.addEventListener('play',  syncPlaying);
-    a.addEventListener('pause', syncPlaying);
-    a.addEventListener('error', onErr);
+    const onWaiting  = () => setBuffering(true);
+    const onPlaying  = () => { setBuffering(false); syncPlaying(); };
+    const onCanPlay  = () => setBuffering(false);
+    a.addEventListener('play',     syncPlaying);
+    a.addEventListener('pause',    syncPlaying);
+    a.addEventListener('error',    onErr);
+    a.addEventListener('waiting',  onWaiting);
+    a.addEventListener('playing',  onPlaying);
+    a.addEventListener('canplay',  onCanPlay);
     return () => {
-      a.removeEventListener('play',  syncPlaying);
-      a.removeEventListener('pause', syncPlaying);
-      a.removeEventListener('error', onErr);
+      a.removeEventListener('play',     syncPlaying);
+      a.removeEventListener('pause',    syncPlaying);
+      a.removeEventListener('error',    onErr);
+      a.removeEventListener('waiting',  onWaiting);
+      a.removeEventListener('playing',  onPlaying);
+      a.removeEventListener('canplay',  onCanPlay);
     };
   }, [audioEl, syncPlaying]);
 
@@ -183,6 +203,7 @@ export default function RadioPage() {
     const a = audioEl;
     if (!a || !station?.streamUrl) return;
     setStreamError('');
+    setBuffering(false);
     setActiveId(station.id);
     ctxSetStationId?.(station.id, { fromUserPick: true });
 
@@ -193,17 +214,21 @@ export default function RadioPage() {
     a.setAttribute('data-radio-src', src);
     a.load();
 
+    setBuffering(true);
     const fail = () => {
       if (gen !== playGenRef.current) return;
-      setStreamError('לא ניתן לטעון את הזרם — נסו תחנה אחרת.');
+      setBuffering(false);
+      setStreamError('תחנה זו אינה זמינה כרגע — נסה תחנה אחרת');
     };
 
     const tryPlay = () => {
       if (gen !== playGenRef.current) return;
-      a.play().catch(err => {
-        if (import.meta.env.DEV) console.warn('[radio] play()', err?.name, err?.message);
-        if (gen === playGenRef.current) fail();
-      });
+      a.play()
+        .then(() => { if (gen === playGenRef.current) setBuffering(false); })
+        .catch(err => {
+          if (import.meta.env.DEV) console.warn('[radio] play()', err?.name, err?.message);
+          if (gen === playGenRef.current) fail();
+        });
     };
 
     if (a.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
@@ -245,6 +270,7 @@ export default function RadioPage() {
     if (!a.paused) {
       playGenRef.current += 1;
       a.pause();
+      setBuffering(false);
       return;
     }
     playStation(station);
@@ -335,12 +361,18 @@ export default function RadioPage() {
 
         /* ── Volume bar ── */
         .rp__vol-bar { display:flex; align-items:center; gap:12px; padding:0 18px 14px; }
-        .rp__vol-label { font-size:.78rem; font-weight:800; color:#8a8a9a; white-space:nowrap; }
-        .rp__vol-bar input[type=range] { flex:1; accent-color:#fbbf24; height:4px; cursor:pointer; }
-        .rp__vol-pct { font-size:.82rem; font-weight:800; color:#fbbf24; min-width:34px; text-align:left; font-variant-numeric:tabular-nums; }
+        .rp__vol-label { font-size:.78rem; font-weight:800; color:#8a8a9a; white-space:nowrap; transition:color .2s; }
+        .rp__vol-bar input[type=range] { flex:1; accent-color:#fbbf24; height:4px; cursor:pointer; transition:opacity .2s; }
+        .rp__vol-pct { font-size:.82rem; font-weight:800; color:#fbbf24; min-width:48px; text-align:left; font-variant-numeric:tabular-nums; display:flex; align-items:center; gap:4px; transition:color .25s; }
+        .rp__vol-pct--muted { color:#6b7280; }
 
         /* ── Error ── */
         .rp__error { margin:0 18px 14px; padding:11px 14px; border-radius:10px; background:rgba(248,113,113,.12); border:1px solid rgba(248,113,113,.35); color:#fecaca; font-size:.85rem; font-weight:700; }
+
+        /* ── Buffering spinner ── */
+        .rp__buffering { display:flex; align-items:center; gap:10px; margin:0 18px 14px; padding:10px 14px; border-radius:10px; background:rgba(99,102,241,.1); border:1px solid rgba(99,102,241,.3); color:#a5b4fc; font-size:.85rem; font-weight:700; }
+        .rp__spinner { width:16px; height:16px; border:2px solid rgba(99,102,241,.3); border-top-color:#6366f1; border-radius:50%; animation:rp-spin .75s linear infinite; flex-shrink:0; }
+        @keyframes rp-spin { to { transform:rotate(360deg); } }
 
         /* ── Grid ── */
         .rp__grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; padding:4px 14px 6px; }
@@ -448,7 +480,7 @@ export default function RadioPage() {
 
         {/* Volume control */}
         <div className="rp__vol-bar">
-          <span className="rp__vol-label">🔊 עוצמה</span>
+          <span className="rp__vol-label">עוצמה</span>
           <input
             type="range"
             min={0}
@@ -458,10 +490,22 @@ export default function RadioPage() {
             onChange={e => setVolume?.(Number(e.target.value))}
             aria-label="עוצמת שמע"
           />
-          <span className="rp__vol-pct" aria-live="polite">
+          <span
+            className={`rp__vol-pct${Math.round((volume ?? 0.85) * 100) === 0 ? ' rp__vol-pct--muted' : ''}`}
+            aria-live="polite"
+          >
+            <span aria-hidden>{volumeIcon}</span>
             {Math.round((volume ?? 0.85) * 100)}%
           </span>
         </div>
+
+        {/* Buffering spinner */}
+        {buffering && !streamError && (
+          <div className="rp__buffering" role="status" aria-label="טוען זרם">
+            <span className="rp__spinner" aria-hidden />
+            טוען תחנה...
+          </div>
+        )}
 
         {/* Stream error */}
         {streamError && (

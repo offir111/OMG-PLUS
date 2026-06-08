@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getApiBaseUrl } from '../lib/apiBaseUrl.js';
 import './AdminPage.css';
@@ -10,8 +10,31 @@ const TABS = [
   { id: 'stats', label: 'סטטיסטיקות' },
 ];
 
+const TOKEN_MAX_AGE_MS = 8 * 60 * 60 * 1000; // 8 hours
+const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+
 function getToken() {
   return localStorage.getItem('omg_admin_token') || '';
+}
+
+function getTokenTimestamp() {
+  return parseInt(localStorage.getItem('omg_admin_token_ts') || '0', 10);
+}
+
+function setTokenTimestamp() {
+  localStorage.setItem('omg_admin_token_ts', Date.now().toString());
+}
+
+function isTokenExpired() {
+  const ts = getTokenTimestamp();
+  if (!ts) return false; // no timestamp recorded yet — treat as valid
+  return Date.now() - ts > TOKEN_MAX_AGE_MS;
+}
+
+function clearAdminAuth() {
+  localStorage.removeItem('omg_admin_token');
+  localStorage.removeItem('omg_admin_token_ts');
+  localStorage.removeItem('omg_user');
 }
 
 function authHeaders() {
@@ -36,13 +59,29 @@ function formatDate(ts) {
   return new Date(ts).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
+/* ─────────── Confirmation Modal ─────────── */
+function ConfirmModal({ message, onConfirm, onCancel }) {
+  return (
+    <div className="admin-modal-overlay" onClick={onCancel}>
+      <div className="admin-modal" onClick={e => e.stopPropagation()} dir="rtl">
+        <p className="admin-modal-message">{message}</p>
+        <div className="admin-modal-actions">
+          <button className="admin-btn admin-btn-red" onClick={onConfirm}>אישור</button>
+          <button className="admin-btn admin-btn-gray" onClick={onCancel}>ביטול</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─────────── Users Tab ─────────── */
-function UsersTab() {
+function UsersTab({ onActivity }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [noteEdit, setNoteEdit] = useState({});
   const [msg, setMsg] = useState('');
+  const [confirm, setConfirm] = useState(null); // { message, onConfirm }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,15 +97,36 @@ function UsersTab() {
     setTimeout(() => setMsg(''), 2500);
   }
 
+  function askConfirm(message, action) {
+    onActivity();
+    setConfirm({ message, onConfirm: action });
+  }
+
+  function closeConfirm() {
+    setConfirm(null);
+  }
+
   async function toggleBlock(user) {
-    const { ok, data } = await apiFetch('/block', {
-      method: 'POST',
-      body: JSON.stringify({ username: user.normalized, blocked: !user.blocked }),
-    });
-    if (ok && data?.users) { setUsers(data.users); flash(user.blocked ? 'שוחרר מחסימה' : 'חסום'); }
+    if (!user.blocked) {
+      askConfirm(`האם לחסום את המשתמש ${user.username}?`, async () => {
+        closeConfirm();
+        const { ok, data } = await apiFetch('/block', {
+          method: 'POST',
+          body: JSON.stringify({ username: user.normalized, blocked: true }),
+        });
+        if (ok && data?.users) { setUsers(data.users); flash('חסום'); }
+      });
+    } else {
+      const { ok, data } = await apiFetch('/block', {
+        method: 'POST',
+        body: JSON.stringify({ username: user.normalized, blocked: false }),
+      });
+      if (ok && data?.users) { setUsers(data.users); flash('שוחרר מחסימה'); }
+    }
   }
 
   async function saveNote(norm) {
+    onActivity();
     const note = noteEdit[norm] ?? users.find(u => u.normalized === norm)?.note ?? '';
     const { ok, data } = await apiFetch('/note', {
       method: 'POST',
@@ -77,6 +137,7 @@ function UsersTab() {
 
   async function resetScore(norm) {
     if (!window.confirm(`לאפס ניקוד של ${norm}?`)) return;
+    onActivity();
     const { ok, data } = await apiFetch('/reset-score', {
       method: 'POST',
       body: JSON.stringify({ username: norm }),
@@ -86,6 +147,7 @@ function UsersTab() {
 
   async function resetLogin(norm, username) {
     if (!window.confirm(`לאפס כניסה של "${username}"?\nהמשתמש יוסר מהמערכת ויוכל להירשם מחדש (ניקוד נשמר).`)) return;
+    onActivity();
     const { ok, data } = await apiFetch('/reset-login', {
       method: 'POST',
       body: JSON.stringify({ username: norm }),
@@ -95,9 +157,11 @@ function UsersTab() {
   }
 
   async function deleteUser(norm, username) {
-    if (!window.confirm(`למחוק לצמיתות את המשתמש "${username}"?`)) return;
-    const { ok, data } = await apiFetch(`/users/${encodeURIComponent(norm)}`, { method: 'DELETE' });
-    if (ok && data?.users) { setUsers(data.users); flash('משתמש נמחק'); }
+    askConfirm(`האם למחוק לצמיתות את המשתמש ${username}? פעולה זו אינה הפיכה!`, async () => {
+      closeConfirm();
+      const { ok, data } = await apiFetch(`/users/${encodeURIComponent(norm)}`, { method: 'DELETE' });
+      if (ok && data?.users) { setUsers(data.users); flash('משתמש נמחק'); }
+    });
   }
 
   const filtered = users.filter(u =>
@@ -106,13 +170,20 @@ function UsersTab() {
 
   return (
     <div className="admin-tab-content">
+      {confirm && (
+        <ConfirmModal
+          message={confirm.message}
+          onConfirm={confirm.onConfirm}
+          onCancel={closeConfirm}
+        />
+      )}
       {msg && <div className="admin-flash">{msg}</div>}
       <div className="admin-search-row">
         <input
           className="admin-input"
           placeholder="חיפוש שם משתמש..."
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={e => { setSearch(e.target.value); onActivity(); }}
         />
         <span className="admin-count">{filtered.length} משתמשים</span>
       </div>
@@ -199,7 +270,7 @@ function UsersTab() {
 }
 
 /* ─────────── Debates Tab ─────────── */
-function DebatesTab() {
+function DebatesTab({ onActivity }) {
   const [debates, setDebates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState('');
@@ -220,6 +291,7 @@ function DebatesTab() {
 
   async function deleteDebate(id) {
     if (!window.confirm('למחוק דיון זה לצמיתות?')) return;
+    onActivity();
     const { ok } = await apiFetch(`/debates/${encodeURIComponent(id)}`, { method: 'DELETE' });
     if (ok) { setDebates(prev => prev.filter(d => d.id !== id)); flash('דיון נמחק'); }
   }
@@ -274,7 +346,7 @@ function DebatesTab() {
 }
 
 /* ─────────── Blog Tab ─────────── */
-function BlogTab() {
+function BlogTab({ onActivity }) {
   const [mod, setMod] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authorInput, setAuthorInput] = useState('');
@@ -305,6 +377,7 @@ function BlogTab() {
   async function blockAuthor() {
     const a = authorInput.trim();
     if (!a) return;
+    onActivity();
     const { ok, data } = await apiFetch('/blog-feed/block-author', {
       method: 'POST',
       body: JSON.stringify({ author: a }),
@@ -313,6 +386,7 @@ function BlogTab() {
   }
 
   async function unblockAuthor(author) {
+    onActivity();
     const { ok, data } = await apiFetch('/blog-feed/unblock-author', {
       method: 'POST',
       body: JSON.stringify({ author }),
@@ -418,17 +492,63 @@ export default function AdminPage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState('users');
   const [authorized, setAuthorized] = useState(null);
+  const inactivityTimer = useRef(null);
+
+  function doLogout() {
+    clearAdminAuth();
+    navigate('/login');
+  }
+
+  function resetInactivityTimer() {
+    if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+    inactivityTimer.current = setTimeout(() => {
+      alert('התנתקת אוטומטית עקב חוסר פעילות של 30 דקות.');
+      doLogout();
+    }, INACTIVITY_TIMEOUT_MS);
+  }
+
+  // Record activity from child tabs
+  function handleActivity() {
+    resetInactivityTimer();
+  }
 
   useEffect(() => {
     const token = getToken();
     if (!token) { setAuthorized(false); return; }
-    apiFetch('/verify').then(({ ok }) => setAuthorized(ok));
+
+    // Check token age
+    if (isTokenExpired()) {
+      clearAdminAuth();
+      setAuthorized(false);
+      return;
+    }
+
+    // Record login timestamp if not present
+    if (!getTokenTimestamp()) {
+      setTokenTimestamp();
+    }
+
+    apiFetch('/verify').then(({ ok }) => {
+      setAuthorized(ok);
+      if (ok) {
+        // Start inactivity timer once authorized
+        resetInactivityTimer();
+        // Track user interactions for inactivity reset
+        const events = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];
+        events.forEach(ev => window.addEventListener(ev, resetInactivityTimer, { passive: true }));
+      }
+    });
+
+    return () => {
+      if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+      const events = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];
+      events.forEach(ev => window.removeEventListener(ev, resetInactivityTimer));
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function logout() {
-    localStorage.removeItem('omg_admin_token');
-    localStorage.removeItem('omg_user');
-    navigate('/login');
+    doLogout();
   }
 
   if (authorized === null) {
@@ -460,21 +580,25 @@ export default function AdminPage() {
         </div>
       </div>
 
+      <div className="admin-security-warning" dir="rtl">
+        ⚠️ שים לב: הישאר מחובר רק במכשיר מאובטח
+      </div>
+
       <div className="admin-tabs">
         {TABS.map(t => (
           <button
             key={t.id}
             className={`admin-tab-btn ${tab === t.id ? 'admin-tab-btn-active' : ''}`}
-            onClick={() => setTab(t.id)}
+            onClick={() => { setTab(t.id); handleActivity(); }}
           >
             {t.label}
           </button>
         ))}
       </div>
 
-      {tab === 'users' && <UsersTab />}
-      {tab === 'debates' && <DebatesTab />}
-      {tab === 'blog' && <BlogTab />}
+      {tab === 'users' && <UsersTab onActivity={handleActivity} />}
+      {tab === 'debates' && <DebatesTab onActivity={handleActivity} />}
+      {tab === 'blog' && <BlogTab onActivity={handleActivity} />}
       {tab === 'stats' && <StatsTab />}
     </div>
   );

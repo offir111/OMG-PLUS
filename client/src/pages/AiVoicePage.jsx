@@ -95,6 +95,7 @@ const CHARACTERS = [
   },
 ];
 
+// micStatus: 'unknown' | 'checking' | 'granted' | 'prompt' | 'denied'
 export default function AiVoicePage() {
   const [selectedChar, setSelectedChar] = useState(null);
   const [inputText, setInputText] = useState("");
@@ -102,9 +103,96 @@ export default function AiVoicePage() {
   const [loading, setLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState(null);
   const [error, setError] = useState(null);
+  const [micStatus, setMicStatus] = useState("unknown");
+  const [micError, setMicError] = useState(null);
   const audioRef = useRef(null);
   const historyEndRef = useRef(null);
   const inputRef = useRef(null);
+
+  // Check microphone permission on mount
+  useEffect(() => {
+    checkMicPermission();
+  }, []);
+
+  async function checkMicPermission() {
+    setMicStatus("checking");
+    setMicError(null);
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setMicStatus("denied");
+      setMicError("הדפדפן שלך אינו תומך בגישה למיקרופון. נסה Chrome או Firefox עדכני.");
+      return;
+    }
+
+    try {
+      if (navigator.permissions && navigator.permissions.query) {
+        const result = await navigator.permissions.query({ name: "microphone" });
+
+        if (result.state === "denied") {
+          setMicStatus("denied");
+          setMicError(
+            "יש להעניק גישה למיקרופון בהגדרות הדפדפן כדי להשתמש בסימולטור הקולי"
+          );
+        } else if (result.state === "prompt") {
+          setMicStatus("prompt");
+          setMicError(null);
+        } else if (result.state === "granted") {
+          setMicStatus("granted");
+          setMicError(null);
+        }
+
+        // Listen for permission changes
+        result.onchange = () => {
+          if (result.state === "granted") {
+            setMicStatus("granted");
+            setMicError(null);
+          } else if (result.state === "denied") {
+            setMicStatus("denied");
+            setMicError(
+              "יש להעניק גישה למיקרופון בהגדרות הדפדפן כדי להשתמש בסימולטור הקולי"
+            );
+          }
+        };
+      } else {
+        // Fallback: try to access mic directly
+        await requestMicAccess();
+      }
+    } catch (e) {
+      // permissions.query not supported — try direct access
+      await requestMicAccess();
+    }
+  }
+
+  async function requestMicAccess() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Stop all tracks immediately — we just needed to check permission
+      stream.getTracks().forEach((t) => t.stop());
+      setMicStatus("granted");
+      setMicError(null);
+    } catch (e) {
+      if (e.name === "NotAllowedError" || e.name === "PermissionDeniedError") {
+        setMicStatus("denied");
+        setMicError(
+          "יש להעניק גישה למיקרופון בהגדרות הדפדפן כדי להשתמש בסימולטור הקולי"
+        );
+      } else if (e.name === "NotFoundError") {
+        setMicStatus("denied");
+        setMicError("לא נמצא מיקרופון במכשיר. אנא חבר מיקרופון ונסה שנית.");
+      } else if (e.name === "NotReadableError") {
+        setMicStatus("denied");
+        setMicError("המיקרופון בשימוש על ידי תוכנה אחרת. סגור אותה ונסה שנית.");
+      } else {
+        setMicStatus("denied");
+        setMicError("שגיאה בגישה למיקרופון: " + (e.message || e.name));
+      }
+    }
+  }
+
+  async function handleRequestMicPermission() {
+    setMicError(null);
+    await requestMicAccess();
+  }
 
   useEffect(() => {
     if (historyEndRef.current) {
@@ -126,6 +214,20 @@ export default function AiVoicePage() {
     }
     const text = inputText.trim();
     if (!text) return;
+
+    // Check mic permission before sending
+    if (micStatus === "denied") {
+      setError(
+        "יש להעניק גישה למיקרופון בהגדרות הדפדפן כדי להשתמש בסימולטור הקולי"
+      );
+      return;
+    }
+
+    if (micStatus === "prompt") {
+      // Try to request permission now
+      await requestMicAccess();
+      if (micStatus === "denied") return;
+    }
 
     setLoading(true);
     setError(null);
@@ -180,7 +282,20 @@ export default function AiVoicePage() {
         );
       }
     } catch (e) {
-      setError(e.message || "שגיאה לא ידועה");
+      if (
+        e.name === "NotAllowedError" ||
+        e.name === "PermissionDeniedError" ||
+        (e.message && e.message.includes("Permission"))
+      ) {
+        setError("יש להעניק גישה למיקרופון בהגדרות הדפדפן כדי להשתמש בסימולטור הקולי");
+        setMicStatus("denied");
+      } else if (e.name === "NotFoundError") {
+        setError("לא נמצא מיקרופון. אנא חבר מיקרופון ונסה שנית.");
+      } else if (e.name === "NotReadableError") {
+        setError("המיקרופון בשימוש על ידי תוכנה אחרת. סגור אותה ונסה שנית.");
+      } else {
+        setError(e.message || "שגיאה לא ידועה");
+      }
     } finally {
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 100);
@@ -200,10 +315,74 @@ export default function AiVoicePage() {
     setTimeout(() => inputRef.current?.focus(), 100);
   }
 
+  function getMicIndicator() {
+    if (micStatus === "granted") {
+      return { icon: "🎤", color: "#4ade80", label: "מיקרופון פעיל" };
+    }
+    if (micStatus === "denied") {
+      return { icon: "🎤", color: "#f87171", label: "מיקרופון חסום" };
+    }
+    if (micStatus === "checking") {
+      return { icon: "🎤", color: "#fbbf24", label: "בודק הרשאה..." };
+    }
+    if (micStatus === "prompt") {
+      return { icon: "🎤", color: "#fbbf24", label: "נדרשת הרשאה" };
+    }
+    return { icon: "🎤", color: "#94a3b8", label: "סטטוס מיקרופון לא ידוע" };
+  }
+
+  const micIndicator = getMicIndicator();
+
   return (
     <div style={styles.page}>
       <h1 style={styles.title}>🎙️ שיחת קול עם AI</h1>
       <p style={styles.subtitle}>בחר דמות ושוחח בקול</p>
+
+      {/* Microphone Status Indicator */}
+      <div style={styles.micStatusRow}>
+        <span style={{ ...styles.micIcon, color: micIndicator.color }}>
+          {micIndicator.icon}
+        </span>
+        <span style={{ ...styles.micLabel, color: micIndicator.color }}>
+          {micIndicator.label}
+        </span>
+        {(micStatus === "prompt" || micStatus === "unknown") && (
+          <button
+            onClick={handleRequestMicPermission}
+            style={styles.micRequestBtn}
+          >
+            אפשר גישה
+          </button>
+        )}
+        {micStatus === "denied" && (
+          <button
+            onClick={checkMicPermission}
+            style={styles.micRequestBtn}
+          >
+            בדוק שנית
+          </button>
+        )}
+      </div>
+
+      {/* Microphone Error / Instructions */}
+      {micError && (
+        <div style={styles.micErrorBox}>
+          <span style={styles.micErrorIcon}>🚫</span>
+          <div style={styles.micErrorContent}>
+            <div style={styles.micErrorText}>{micError}</div>
+            {micStatus === "denied" && (
+              <div style={styles.micInstructions}>
+                <strong>כיצד לאפשר גישה:</strong>
+                <ul style={styles.micInstructionsList}>
+                  <li>Chrome: לחץ על סמל המנעול/מיקרופון בשורת הכתובת ← הגדרות אתר ← מיקרופון ← אפשר</li>
+                  <li>Firefox: לחץ על סמל המיקרופון ליד שורת הכתובת ← הסר חסימה</li>
+                  <li>Safari: העדפות ← אתרים ← מיקרופון ← אפשר לאתר זה</li>
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Character Grid */}
       <div style={styles.grid}>
@@ -361,7 +540,75 @@ const styles = {
     textAlign: "center",
     color: "#94a3b8",
     fontSize: 14,
-    margin: "0 0 24px",
+    margin: "0 0 16px",
+  },
+  micStatusRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+    justifyContent: "flex-end",
+    direction: "rtl",
+  },
+  micIcon: {
+    fontSize: 18,
+    lineHeight: 1,
+  },
+  micLabel: {
+    fontSize: 13,
+    fontWeight: 600,
+  },
+  micRequestBtn: {
+    background: "rgba(139,92,246,0.25)",
+    border: "1px solid rgba(139,92,246,0.5)",
+    color: "#c4b5fd",
+    borderRadius: 8,
+    padding: "4px 12px",
+    fontSize: 12,
+    cursor: "pointer",
+    fontFamily: "inherit",
+    direction: "rtl",
+  },
+  micErrorBox: {
+    background: "rgba(239,68,68,0.1)",
+    border: "1px solid rgba(239,68,68,0.35)",
+    borderRadius: 12,
+    padding: "12px 14px",
+    marginBottom: 14,
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 10,
+    direction: "rtl",
+    animation: "fadeIn 0.3s ease",
+  },
+  micErrorIcon: {
+    fontSize: 20,
+    flexShrink: 0,
+    marginTop: 2,
+  },
+  micErrorContent: {
+    flex: 1,
+  },
+  micErrorText: {
+    color: "#fca5a5",
+    fontSize: 14,
+    fontWeight: 600,
+    marginBottom: 6,
+    lineHeight: 1.5,
+  },
+  micInstructions: {
+    color: "#cbd5e1",
+    fontSize: 13,
+    lineHeight: 1.5,
+  },
+  micInstructionsList: {
+    margin: "6px 0 0 0",
+    paddingRight: 18,
+    paddingLeft: 0,
+    listStyleType: "disc",
+    color: "#94a3b8",
+    fontSize: 12,
+    lineHeight: 1.7,
   },
   grid: {
     display: "grid",
